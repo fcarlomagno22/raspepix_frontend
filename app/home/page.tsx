@@ -12,7 +12,6 @@ import TransferModal from "@/components/transfer-modal"
 import { useAudioPlayer } from "@/contexts/audio-player-context"
 import AuthenticatedLayout from "@/components/authenticated-layout"
 import { api } from "@/services/api"
-import Cookies from 'js-cookie';
 
 interface Winner {
   id: number
@@ -101,13 +100,10 @@ export default function HomePage() {
     // Buscar o primeiro nome do usuário
     const fetchUserName = async () => {
       try {
-        const response = await fetch('/api/profile/first-name', {
-          credentials: 'include'
-        });
-        if (!response.ok) throw new Error('Erro ao buscar nome do usuário');
-        const data = await response.json();
-        if (data.firstName) {
-          setUserName(data.firstName);
+        const response = await api.get('/api/profile/first-name');
+        const { firstName } = response.data;
+        if (firstName) {
+          setUserName(firstName);
         }
       } catch (error) {
         console.error('Erro ao buscar nome do usuário:', error);
@@ -172,25 +168,6 @@ export default function HomePage() {
         />
       </div>
       
-      {/* Seção de Boas-vindas */}
-      {userName && (
-        <div className="px-3 md:px-4 lg:px-8 max-w-6xl mx-auto mb-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center"
-          >
-            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-[#9FFF00] to-yellow-400 bg-clip-text text-transparent">
-              Fala, {userName}! 🎉
-            </h1>
-            <p className="text-gray-300 mt-2">
-              Bora raspar e ganhar uns prêmios hoje? 😎
-            </p>
-          </motion.div>
-        </div>
-      )}
-
       <main className="flex-1 pb-24 md:pb-28 px-3 md:px-4 lg:px-8 max-w-full md:max-w-6xl mx-auto w-full">
         {/* Segundo Vídeo Banner */}
         <div className="relative rounded-lg md:rounded-xl overflow-hidden mb-6 md:mb-8">
