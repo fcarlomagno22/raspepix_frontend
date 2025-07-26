@@ -98,20 +98,13 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
+    // Buscar o primeiro nome do usuário
     const fetchUserName = async () => {
       try {
-        const token = Cookies.get('access_token');
-        if (!token) {
-          console.error('Token não encontrado');
-          return;
-        }
-
-        const response = await fetch('/api/profile/first-name');
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Erro ao buscar nome do usuário');
-        }
-        
+        const response = await fetch('/api/profile/first-name', {
+          credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Erro ao buscar nome do usuário');
         const data = await response.json();
         if (data.firstName) {
           setUserName(data.firstName);
