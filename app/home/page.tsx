@@ -12,6 +12,7 @@ import TransferModal from "@/components/transfer-modal"
 import { useAudioPlayer } from "@/contexts/audio-player-context"
 import AuthenticatedLayout from "@/components/authenticated-layout"
 import { api } from "@/services/api"
+import Cookies from 'js-cookie';
 
 interface Winner {
   id: number
@@ -97,13 +98,23 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
-    // Buscar o primeiro nome do usuário
     const fetchUserName = async () => {
       try {
-        const response = await api.get('/api/profile/first-name');
-        const { firstName } = response.data;
-        if (firstName) {
-          setUserName(firstName);
+        const token = Cookies.get('access_token');
+        if (!token) {
+          console.error('Token não encontrado');
+          return;
+        }
+
+        const response = await fetch('/api/profile/first-name');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Erro ao buscar nome do usuário');
+        }
+        
+        const data = await response.json();
+        if (data.firstName) {
+          setUserName(data.firstName);
         }
       } catch (error) {
         console.error('Erro ao buscar nome do usuário:', error);
