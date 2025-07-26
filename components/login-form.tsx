@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Mail, Eye, EyeOff } from "lucide-react"
 import Cookies from 'js-cookie'
+import { api } from "@/services/api"
 
 const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState(false)
@@ -27,40 +28,34 @@ const LoginForm: React.FC = () => {
     const password = formData.get("password") as string
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
-      });
+      const response = await api.post('/api/auth/login', { email, password });
 
-      if (!response.ok) {
-        switch (response.status) {
-          case 400:
-            throw new Error('Dados inválidos. Verifique suas informações.');
-          case 401:
-            throw new Error('Email ou senha incorretos.');
-          case 500:
-            throw new Error('Erro no servidor. Tente novamente mais tarde.');
-          default:
-            throw new Error('Erro ao fazer login. Tente novamente.');
-        }
-      }
-
-      const data = await response.json();
-      
       // Define os cookies com expiração de 1 hora
       const oneHour = new Date(new Date().getTime() + 60 * 60 * 1000);
-      Cookies.set('access_token', data.access_token, { expires: oneHour });
-      Cookies.set('refresh_token', data.refresh_token, { expires: oneHour });
-      Cookies.set('user', JSON.stringify(data.user), { expires: oneHour });
+      Cookies.set('access_token', response.data.access_token, { expires: oneHour });
+      Cookies.set('refresh_token', response.data.refresh_token, { expires: oneHour });
+      Cookies.set('user', JSON.stringify(response.data.user), { expires: oneHour });
 
       // Redireciona para a página home usando replace em vez de push
       router.replace('/home');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao fazer login. Tente novamente.');
+    } catch (err: any) {
+      if (err.response) {
+        switch (err.response.status) {
+          case 400:
+            setError('Dados inválidos. Verifique suas informações.');
+            break;
+          case 401:
+            setError('Email ou senha incorretos.');
+            break;
+          case 500:
+            setError('Erro no servidor. Tente novamente mais tarde.');
+            break;
+          default:
+            setError('Erro ao fazer login. Tente novamente.');
+        }
+      } else {
+        setError('Erro ao conectar ao servidor. Verifique sua conexão.');
+      }
     } finally {
       setIsLoading(false);
     }
