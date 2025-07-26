@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  .neon-glow-green {
+    color: white;
+    text-shadow: 0 0 7px #fff, 0 0 10px #fff, 0 0 21px #fff, 0 0 42px #0f0, /* Green neon glow */ 0 0 82px #0f0, 0 0
+      92px #0f0, 0 0 102px #0f0, 0 0 151px #0f0;
+  }
+}
+
+@keyframes text-glow-blink {
+  0%,
+  100% {
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5), 0 0 10px rgba(255, 255, 255, 0.5), 0 0 15px rgba(255, 255, 255, 0.5);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.8);
+  }
+}
+
+.animate-text-glow-blink {
+  animation: text-glow-blink 2s infinite alternate;
+}
+
+/* New golden pulse animation for slot elements */
+@keyframes golden-pulse {
+  0% {
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+  }
+}
+
+.animate-golden-pulse {
+  animation: golden-pulse 2s infinite ease-in-out;
+}
+
+/* New sparkle/glint animation for blinking dots */
+@keyframes sparkle-glint {
+  0%,
+  100% {
+    box-shadow: 0 0 0px rgba(255, 215, 0, 0);
+  }
+  20% {
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.8), 0 0 15px rgba(255, 215, 0, 0.5);
+  }
+  40% {
+    box-shadow: 0 0 0px rgba(255, 215, 0, 0);
+  }
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Estilos para bilhetes */
+.bilhete {
+  padding: 1rem;
+  border: 1px solid #ccc;
+  margin: 0.5rem;
+  position: relative;
+  background-color: #1E2530;
+  border-color: #2A3441;
+  transition: all 0.2s ease;
+}
+
+.bilhete.premiado {
+  border-color: #9FFF00;
+  background-color: rgba(159, 255, 0, 0.05);
+}
+
+.bilhete.utilizado {
+  opacity: 0.7;
+}
+
+.bilhete .status {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.bilhete .status.disponivel {
+  background-color: rgba(159, 255, 0, 0.1);
+  color: #9FFF00;
+}
+
+.bilhete .status.utilizado {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+}

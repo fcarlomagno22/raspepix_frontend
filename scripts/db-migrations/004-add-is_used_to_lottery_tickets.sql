@@ -1,0 +1,2 @@
+ALTER TABLE lottery_tickets
+ADD COLUMN is_used BOOLEAN DEFAULT FALSE;
