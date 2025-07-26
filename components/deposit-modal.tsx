@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from "react" // Importar useRef
 import Image from "next/image"
 import { Copy, Check } from "lucide-react"
 import Cookies from 'js-cookie'
+import { api } from '@/services/api';
 
 interface DepositModalProps {
   isOpen: boolean
@@ -219,24 +220,12 @@ export default function DepositModal({ isOpen, onClose, onDepositSuccess }: Depo
         throw new Error('Usuário não autenticado')
       }
 
-      const response = await fetch('http://localhost:3000/api/sorteio/comprar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          quantidade_numeros: calculatedDetails.quantity,
-          valor_total: calculatedDetails.finalPrice.toFixed(2)
-        })
-      })
+      const response = await api.post('/api/sorteio/comprar', {
+        quantidade: calculatedDetails.quantity,
+        valor_total: calculatedDetails.finalPrice.toFixed(2)
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Erro ao processar a compra')
-      }
-
-      const data = await response.json()
+      const data = response.data;
 
       // Armazena os números retornados
       setPurchasedNumbers(data.data)

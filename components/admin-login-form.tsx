@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { api } from '@/services/api';
+import Cookies from 'js-cookie';
 
 export default function AdminLoginForm() {
   const [isLoading, setIsLoading] = useState(false)
@@ -17,49 +19,30 @@ export default function AdminLoginForm() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault()
-    setIsLoading(true)
-    setError(null)
-
-    const formData = new FormData(event.currentTarget as HTMLFormElement)
-    const email = formData.get("email") as string
-    const senha = formData.get("password") as string
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const response = await fetch('http://localhost:3000/api/admin/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, senha }),
-      });
+      const formData = new FormData(event.currentTarget);
+      const email = formData.get('email') as string;
+      const password = formData.get('password') as string;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao fazer login');
-      }
-
-      // Salva o token no localStorage
-      localStorage.setItem('admin_token', data.token);
-      localStorage.setItem('admin_user', JSON.stringify(data.admin));
-
-      // Também salva o token como cookie para o middleware
-      document.cookie = `admin_token=${data.token}; path=/; secure; samesite=strict`;
-
-      // Redireciona para o dashboard usando replace
-      await router.replace('/admin/dashboard');
+      const response = await api.post('/api/admin/login', { email, password });
       
-      // Força um refresh da página após o redirecionamento
-      window.location.reload();
-
-    } catch (err) {
-      setError('Credenciais de administrador inválidas. Tente novamente.');
+      // Armazenar token
+      Cookies.set('admin_token', response.data.token);
+      
+      // Redirecionar para dashboard
+      router.replace('/admin/dashboard');
+    } catch (error: any) {
+      console.error('Erro no login:', error);
+      setError(error.response?.data?.message || 'Erro ao fazer login. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   return (
     <Card className="w-full max-w-md border-[#1a323a] bg-[#191F26] shadow-xl animate-fade-in relative pb-[180px] md:pb-12">
@@ -78,7 +61,7 @@ export default function AdminLoginForm() {
         <CardDescription className="text-gray-400">Entre com suas credenciais de administrador</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="email" className="text-gray-300">
               E-mail Administrativo

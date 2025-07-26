@@ -20,6 +20,8 @@ import {
   validateEmail,
 } from "@/lib/form-utils"
 import { cn } from "@/lib/utils" // Assuming cn is available for conditional class names
+import { api } from '@/services/api';
+import Cookies from 'js-cookie';
 
 interface FormData {
   cpf: string
@@ -117,6 +119,8 @@ export default function RegistrationForm() {
   const [direction, setDirection] = useState(0)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [error, setError] = useState<string | null>(null);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -224,54 +228,39 @@ export default function RegistrationForm() {
     setCurrentStep((prev) => prev - 1)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (validateStep(2)) {
-      setIsLoading(true)
-      try {
-        // Formata a data para o formato esperado pela API
-        const [day, month, year] = formData.dob.split('/')
-        const formattedDate = `${year}-${month}-${day}`
-        
-        // Remove máscara do CPF e telefone
-        const cleanCpf = formData.cpf.replace(/\D/g, '')
-        const cleanPhone = formData.phone.replace(/\D/g, '')
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
 
-        const response = await fetch('http://localhost:3000/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            full_name: formData.fullName,
-            social_name: formData.socialName,
-            cpf: cleanCpf,
-            birth_date: formattedDate,
-            gender: formData.gender.toLowerCase(),
-            phone: cleanPhone,
-            accepted_terms: formData.termsAccepted
-          })
-        })
+    try {
+      const formData = new FormData(event.currentTarget);
+      const data = {
+        email: formData.get('email') as string,
+        password: formData.get('password') as string,
+        fullname: formData.get('fullname') as string,
+        cpf: formData.get('cpf') as string,
+        phone: formData.get('phone') as string,
+        referral_code: formData.get('referral_code') as string
+      };
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || 'Erro ao realizar cadastro')
-        }
+      const response = await api.post('/api/auth/register', data);
+      
+      // Armazenar tokens
+      const oneHour = new Date(new Date().getTime() + 60 * 60 * 1000);
+      Cookies.set('access_token', response.data.access_token, { expires: oneHour });
+      Cookies.set('refresh_token', response.data.refresh_token, { expires: oneHour });
+      Cookies.set('user', JSON.stringify(response.data.user), { expires: oneHour });
 
-        // Cadastro realizado com sucesso
-        router.push('/login')
-      } catch (error) {
-        setErrors(prev => ({
-          ...prev,
-          submit: error instanceof Error ? error.message : 'Erro ao realizar cadastro. Tente novamente.'
-        }))
-      } finally {
-        setIsLoading(false)
-      }
+      // Redirecionar para home
+      router.replace('/home');
+    } catch (error: any) {
+      console.error('Erro no registro:', error);
+      setError(error.response?.data?.message || 'Erro ao criar conta. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   // Removed CEP auto-fill effect as the address step is removed
   // useEffect(() => {
@@ -663,8 +652,8 @@ export default function RegistrationForm() {
               </Button>
             )}
           </div>
-          {errors.submit && (
-            <p className="text-red-500 text-sm text-center mt-4">{errors.submit}</p>
+          {error && (
+            <p className="text-red-500 text-sm text-center mt-4">{error}</p>
           )}
         </form>
       </div>
