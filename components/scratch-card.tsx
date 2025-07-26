@@ -30,7 +30,7 @@ export function ScratchCard({
   const ORIGINAL_IMAGE_HEIGHT = 700
   const ORIGINAL_CANVAS_WIDTH_FACTOR = 0.63
   const ORIGINAL_CANVAS_WIDTH_OFFSET = 22
-  const ORIGINAL_CANVAS_HEIGHT_FACTOR = 0.21
+  const ORIGINAL_CANVAS_HEIGHT_FACTOR = 0.19
   const ORIGINAL_CANVAS_HEIGHT_OFFSET = -25
   const ORIGINAL_CANVAS_LEFT_OFFSET_ADJUSTMENT = -2
   const ORIGINAL_CANVAS_TOP_OFFSET_PIXELS = 445
@@ -246,7 +246,7 @@ export function ScratchCard({
         />
         <canvas
           ref={canvasRef}
-          className="touch-none rounded-2xl text-slate-700"
+          className="touch-none rounded-lg text-slate-700"
           onMouseDown={handleScratchStart}
           onMouseMove={handleScratchMove}
           onMouseUp={handleScratchEnd}
