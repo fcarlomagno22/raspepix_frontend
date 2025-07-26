@@ -4,7 +4,7 @@ import type { Notification } from "@/types/notification"
 
 // Configuração base do axios
 export const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://raspepixbackend-production.up.railway.app',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'

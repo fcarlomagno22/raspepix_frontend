@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 
 // Rotas que não precisam de autenticação
 const publicRoutes = [
+  '/',
   '/login',
   '/cadastro',
   '/recuperarsenha',
