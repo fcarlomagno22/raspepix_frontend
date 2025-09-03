@@ -30,7 +30,7 @@ export interface WithdrawRequestsResponse {
 }
 
 export const fetchWithdrawRequests = async (): Promise<WithdrawRequestsResponse> => {
-  const response = await api.get<WithdrawRequestsResponse>("/api/influencer/solicitacoes-saque")
+  const response = await api.get<WithdrawRequestsResponse>("/api/influencers/solicitacoes-saque")
   return response.data
 }
 
@@ -39,6 +39,6 @@ interface CancelWithdrawResponse {
 }
 
 export const cancelWithdrawRequest = async (id: string): Promise<CancelWithdrawResponse> => {
-  const response = await api.put<CancelWithdrawResponse>(`/api/influencer/solicitacoes-saque/${id}/cancelar`)
+  const response = await api.put<CancelWithdrawResponse>(`/api/influencers/solicitacoes-saque/${id}/cancelar`)
   return response.data
 }
