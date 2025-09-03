@@ -77,14 +77,14 @@ export default function Hqs() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
-                <Card className="bg-[#1E2530] border border-[#9FFF00]/10 text-white overflow-hidden h-full flex flex-col">
-                  <div className="relative w-full h-64 sm:h-72 md:h-80 overflow-hidden">
+                <Card className="bg-[#1E2530] border border-[#9FFF00]/10 text-white overflow-hidden h-full flex flex-col [&>*:first-child]:rounded-none">
+                  <div className="relative w-full h-[400px] overflow-hidden">
                     <img
                       src={hq.coverImage || "/placeholder.svg"}
                       alt={`Capa da HQ: ${hq.title}`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-fill"
                       width={400}
-                      height={256}
+                      height={400}
                     />
                   </div>
                   <CardHeader className="p-4 pb-2 flex-grow text-center">

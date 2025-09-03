@@ -10,19 +10,23 @@ import { Progress } from "@/components/ui/progress"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { ArrowLeft, Camera, Video, RefreshCcw, Send } from "lucide-react"
 import { formatCPF, formatCurrency } from "@/lib/utils"
+import { useCarteiraPremios } from "@/hooks/use-carteira-premios"
+import { api } from "@/services/api"
+import { toast } from "sonner"
 
 interface WithdrawModalProps {
   isOpen: boolean
   onClose: () => void
-  currentSaldoSacavel: number
   onWithdrawSuccess: (amount: number) => void
 }
 
 const MIN_WITHDRAWAL_AMOUNT = 5.0 // R$ 5,00
 const MIN_VIDEO_DURATION = 5 // segundos
 const MAX_VIDEO_DURATION = 15 // segundos
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024 // 50MB em bytes
 
-export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, onWithdrawSuccess }: WithdrawModalProps) {
+export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: WithdrawModalProps) {
+  const { saldo: currentSaldoSacavel, isLoading: isLoadingSaldo, refetch: refetchSaldo } = useCarteiraPremios()
   const [currentStep, setCurrentStep] = useState(1)
   const [withdrawAmountDisplay, setWithdrawAmountDisplay] = useState("")
   const [withdrawAmountCents, setWithdrawAmountCents] = useState<number | null>(null)
@@ -44,7 +48,9 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null)
   const [videoSent, setVideoSent] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [videoError, setVideoError] = useState<string | null>(null)
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null)
 
   const availableBalance = currentSaldoSacavel
 
@@ -63,7 +69,9 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
       setVideoBlob(null)
       setVideoSent(false)
       setUploadingVideo(false)
+      setUploadProgress(0)
       setVideoError(null)
+      setUploadedVideoUrl(null)
     } else if (isOpen && currentStep === 3) {
       // Changed to currentStep === 3 for video step
       // Automatically start camera when video step is active
@@ -95,22 +103,51 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }, 
+        audio: true // Habilitando áudio
+      })
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         videoRef.current.play()
       }
-      mediaRecorderRef.current = new MediaRecorder(stream)
+
+      // Configurar o MediaRecorder com opções específicas
+      const options = {
+        mimeType: 'video/webm;codecs=vp8,opus', // WebM com VP8 para vídeo e Opus para áudio
+        videoBitsPerSecond: 2500000, // 2.5 Mbps para vídeo
+        audioBitsPerSecond: 128000 // 128 kbps para áudio
+      }
+
+      mediaRecorderRef.current = new MediaRecorder(stream, options)
+
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data)
         }
       }
+
+      console.log('MediaRecorder configurado com formato:', mediaRecorderRef.current.mimeType)
+
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: "video/webm" })
-        const url = URL.createObjectURL(blob)
+        // Criar o Blob especificando o tipo
+        const recordedBlob = new Blob(recordedChunksRef.current, { 
+          type: 'video/webm'
+        })
+        
+        console.log('Vídeo gravado:', {
+          tipo: recordedBlob.type,
+          tamanho: recordedBlob.size
+        })
+
+        const url = URL.createObjectURL(recordedBlob)
         setVideoPreviewUrl(url)
-        setVideoBlob(blob)
+        setVideoBlob(recordedBlob)
         setIsRecording(false)
         stopCamera() // Stop camera after recording is done
       }
@@ -141,7 +178,8 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
   const startRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "inactive") {
       recordedChunksRef.current = []
-      mediaRecorderRef.current.start()
+      
+      // Resetar estados
       setIsRecording(true)
       setRecordingTime(0)
       setVideoPreviewUrl(null)
@@ -149,6 +187,11 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
       setVideoSent(false)
       setVideoError(null)
 
+      // Iniciar gravação coletando dados a cada segundo
+      console.log('Iniciando gravação com formato:', mediaRecorderRef.current.mimeType)
+      mediaRecorderRef.current.start(1000)
+
+      // Iniciar timer para controlar duração máxima
       recordingTimerRef.current = setInterval(() => {
         setRecordingTime((prevTime) => {
           const newTime = prevTime + 1
@@ -158,6 +201,9 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
           return newTime
         })
       }, 1000)
+    } else {
+      console.warn('MediaRecorder não está pronto ou já está gravando:', 
+        mediaRecorderRef.current?.state || 'não inicializado')
     }
   }, [])
 
@@ -178,16 +224,68 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
       return
     }
 
+    // Verificar tamanho do vídeo
+    if (videoBlob.size > MAX_VIDEO_SIZE) {
+      setVideoError(`O vídeo excede o tamanho máximo permitido de ${MAX_VIDEO_SIZE / (1024 * 1024)}MB.`)
+      return
+    }
+
     setUploadingVideo(true)
     setVideoError(null)
 
-    // Simulate video upload
-    await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate network delay
+    try {
+      // Garantir que o tipo do vídeo está correto
+      console.log('Tipo original do blob:', videoBlob.type)
+      
+      // Se o tipo estiver vazio ou incorreto, forçar para webm
+      const videoType = videoBlob.type || 'video/webm'
+      
+      // Criar um novo blob com o tipo correto se necessário
+      const videoWithType = videoBlob.type ? videoBlob : new Blob([videoBlob], { type: videoType })
+      
+      // Criar um arquivo com extensão correta
+      const videoFile = new File([videoWithType], 'video.webm', { type: videoType })
+      
+      console.log('Arquivo a ser enviado:', {
+        nome: videoFile.name,
+        tipo: videoFile.type,
+        tamanho: videoFile.size
+      })
 
-    console.log("Video sent:", videoBlob)
-    setVideoSent(true)
-    setUploadingVideo(false)
-    // Do not stop camera here, it's already stopped in mediaRecorder.onstop
+      const formData = new FormData()
+      formData.append('video', videoFile)
+
+      // Verificar o conteúdo do FormData
+      console.log('Conteúdo do FormData:')
+      for (const pair of formData.entries()) {
+        console.log(pair[0], pair[1])
+      }
+
+      const response = await api.post('/api/upload/video', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total!)
+          setUploadProgress(percentCompleted)
+        }
+      })
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Erro ao fazer upload do vídeo')
+      }
+
+      setUploadedVideoUrl(response.data.url)
+      setVideoSent(true)
+      toast.success("Vídeo enviado com sucesso!")
+      
+    } catch (error: any) {
+      console.error('Erro detalhado:', error)
+      setVideoError(error.response?.data?.message || "Erro ao enviar o vídeo. Por favor, tente novamente.")
+      toast.error("Erro ao enviar o vídeo")
+    } finally {
+      setUploadingVideo(false)
+    }
   }, [videoBlob])
 
   const handleRetakeVideo = useCallback(() => {
@@ -271,15 +369,34 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
     setCurrentStep((prev) => prev - 1)
   }
 
-  const handleConfirmWithdrawal = () => {
+  const handleConfirmWithdrawal = async () => {
     const amountToWithdraw = withdrawAmountCents ? withdrawAmountCents / 100 : 0
-    console.log("Saque confirmado:", {
-      amount: amountToWithdraw,
-      pixKey: pixKeyRaw,
-      videoBlob: videoBlob, // Include video blob in console log for confirmation
-    })
-    onWithdrawSuccess(amountToWithdraw)
-    onClose()
+    
+    if (!uploadedVideoUrl) {
+      setVideoError("É necessário enviar um vídeo para confirmar o saque.")
+      return
+    }
+
+    try {
+      const response = await api.post('/api/saque/solicitar', {
+        valor: amountToWithdraw.toFixed(2),
+        cpf: pixKeyRaw,
+        videoUrl: uploadedVideoUrl
+      })
+
+      if (response.data.success) {
+        await refetchSaldo() // Atualiza o saldo imediatamente
+        onWithdrawSuccess(amountToWithdraw)
+        onClose()
+        toast.success('Saque solicitado com sucesso!')
+      } else {
+        throw new Error(response.data.message || 'Erro ao solicitar saque')
+      }
+    } catch (error: any) {
+      console.error('Erro ao solicitar saque:', error)
+      setWithdrawError(error.response?.data?.message || 'Erro ao solicitar saque. Por favor, tente novamente.')
+      toast.error('Erro ao solicitar saque')
+    }
   }
 
   const progressValue = (currentStep / 4) * 100
@@ -472,7 +589,12 @@ export default function WithdrawModal({ isOpen, onClose, currentSaldoSacavel, on
                     disabled={uploadingVideo || videoSent}
                   >
                     {uploadingVideo ? (
-                      "Enviando..."
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span>Enviando {uploadProgress}%</span>
+                          <Progress value={uploadProgress} className="w-16 h-2" />
+                        </div>
+                      </>
                     ) : videoSent ? (
                       "Enviado!"
                     ) : (

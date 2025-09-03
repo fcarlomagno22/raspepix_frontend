@@ -1,6 +1,8 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+export const isProduction = () => process.env.NODE_ENV === 'production';
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -141,4 +143,33 @@ export function formatCPF(cpf: string): string {
 
 export function formatPercentage(value: number): string {
   return `${(value * 100).toFixed(2)}%`
+}
+
+export function formatPhoneNumber(phone: string): string {
+  // Remove non-numeric characters
+  const cleaned = phone.replace(/\D/g, "")
+  // Apply phone mask (XX) X XXXX-XXXX
+  return cleaned.replace(/(\d{2})(\d{1})(\d{4})(\d{4})/, "($1) $2 $3-$4")
+}
+
+export function capitalizeFirstLetter(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
+}
+
+export function formatDateBR(dateString: string | undefined | null): string {
+  if (!dateString) return "Data não disponível"
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) {
+      return "Data inválida"
+    }
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    }).format(date)
+  } catch (error) {
+    console.error("Erro ao formatar data:", error)
+    return "Data inválida"
+  }
 }

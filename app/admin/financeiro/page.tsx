@@ -6,12 +6,14 @@ import AdminSidebar from "@/components/admin/admin-sidebar"
 import AdminHeaderMobile from "@/components/admin/admin-header-mobile"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PermissionGuard } from "@/components/admin/permission-guard"
 
 // Import finance components
 import FinanceiroOverviewDashboard from "@/components/admin/financeiro/financeiro-overview-dashboard"
 import FinanceiroPurchasesTable from "@/components/admin/financeiro/financeiro-purchases-table"
 import FinanceiroNewEditionSimulator from "@/components/admin/financeiro/financeiro-new-edition-simulator"
 import FinanceiroDRE from "@/components/admin/financeiro/financeiro-dre"
+import FinanceiroInfluencerPayments from "@/components/admin/financeiro/financeiro-influencer-payments"
 
 const SESSION_TIMEOUT_SECONDS = 3 * 60 // 3 minutes
 const WARNING_THRESHOLD_SECONDS = 60 // 1 minute
@@ -72,19 +74,20 @@ export default function FinanceiroPage() {
   const currentEditionData = editions.find((e) => e.id === selectedEdition) || editions[0]
 
   return (
-    <div className="flex min-h-screen bg-[#0D1117] text-white">
-      {/* Mobile Header */}
-      <AdminHeaderMobile
-        onOpenSidebar={() => {
-          /* Handled by AdminSidebar's SheetTrigger */
-        }}
-      />
+    <PermissionGuard requiredPermission="financeiro">
+      <div className="flex min-h-screen text-white">
+        {/* Mobile Header */}
+        <AdminHeaderMobile
+          onOpenSidebar={() => {
+            /* Handled by AdminSidebar's SheetTrigger */
+          }}
+        />
 
-      {/* Sidebar (Desktop fixed, Mobile overlay) */}
-      <AdminSidebar sessionTimeRemaining={sessionTimeRemaining} onLogout={handleLogout} />
+        {/* Sidebar (Desktop fixed, Mobile overlay) */}
+        <AdminSidebar sessionTimeRemaining={sessionTimeRemaining} onLogout={handleLogout} />
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-4 md:p-6 overflow-y-auto pt-20 lg:pt-6 lg:ml-64">
+        {/* Main Content Area */}
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto pt-20 lg:pt-6 lg:ml-64">
         {/* Session Warning */}
         {showSessionWarning && (
           <div className="fixed top-0 left-0 right-0 bg-red-800/80 text-white text-center py-2 z-50 animate-pulse">
@@ -119,6 +122,12 @@ export default function FinanceiroPage() {
               Resumo Geral
             </TabsTrigger>
             <TabsTrigger
+              value="influencer-payments"
+              className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#9FFF00] data-[state=active]:text-[#9FFF00] data-[state=active]:bg-transparent py-3 text-white text-center min-w-0"
+            >
+              Pagamentos Influencers
+            </TabsTrigger>
+            <TabsTrigger
               value="simulator"
               className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#9FFF00] data-[state=active]:text-[#9FFF00] data-[state=active]:bg-transparent py-3 text-white text-center min-w-0"
             >
@@ -134,21 +143,29 @@ export default function FinanceiroPage() {
 
           <TabsContent value="overview">
             {/* KPIs */}
-            <FinanceiroOverviewDashboard currentEdition={currentEditionData} />
+            <FinanceiroOverviewDashboard />
             <div className="p-4 flex-1 overflow-auto">
               <FinanceiroPurchasesTable />
             </div>
           </TabsContent>
+
+          <TabsContent value="influencer-payments">
+            <div className="p-4 flex-1 overflow-auto">
+              <FinanceiroInfluencerPayments />
+            </div>
+          </TabsContent>
+
           <TabsContent value="simulator">
             {/* KPIs */}
-            <FinanceiroOverviewDashboard currentEdition={currentEditionData} />
+            <FinanceiroOverviewDashboard />
             <div className="p-4 flex-1 overflow-auto">
               <FinanceiroNewEditionSimulator />
             </div>
           </TabsContent>
+
           <TabsContent value="dre">
             {/* KPIs */}
-            <FinanceiroOverviewDashboard currentEdition={currentEditionData} />
+            <FinanceiroOverviewDashboard />
             <div className="p-4 flex-1 overflow-auto">
               <FinanceiroDRE />
             </div>
@@ -156,5 +173,6 @@ export default function FinanceiroPage() {
         </Tabs>
       </main>
     </div>
+    </PermissionGuard>
   )
 }

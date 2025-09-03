@@ -2,76 +2,76 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Cookies from 'js-cookie'
+import { adminAuth } from '@/services/auth'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import AdminSidebar from "@/components/admin/admin-sidebar"
 import AdminHeaderMobile from "@/components/admin/admin-header-mobile"
 import DashboardMetrics from "@/components/admin/dashboard-metrics"
-import DashboardActivity from "@/components/admin/dashboard-activity"
-import DashboardPrizeGoal from "@/components/admin/dashboard-prize-goal"
-import DailyRevenueChart from "@/components/admin/daily-revenue-chart" // Importar o novo componente
+import { dashboardService, type Edicao, type DashboardMetrics as DashboardMetricsType } from "@/services/dashboard"
+import DailyRevenueChart from "@/components/admin/daily-revenue-chart"
 import HourlySalesChart from "@/components/admin/hourly-sales-chart"
-
-// Mock Data
-const mockEditions = [
-  { id: "1", name: "Edição #1 – 01/01 até 07/01", period: "01/01/2024 - 07/01/2024" },
-  { id: "2", name: "Edição #2 – 08/01 até 14/01", period: "08/01/2024 - 14/01/2024" },
-  { id: "3", name: "Edição #3 – 15/01 até 21/01", period: "15/01/2024 - 21/01/2024" },
-  { id: "4", name: "Edição #4 – 22/01 até 28/01", period: "22/01/2024 - 28/01/2024" },
-  { id: "5", name: "Edição #5 – 29/01 até 04/02", period: "29/01/2024 - 04/02/2024", current: true },
-]
-
-const mockMetrics = {
-  totalRevenue: 125000,
-  totalPrizeValue: 87500,
-  prizesRemaining: 12500, // Changed from 750 to a currency value
-  weeklyParticipants: 3200,
-  tokensGenerated: 25000,
-  tokensUsed: 18500,
-  scratchCardsPlayed: 18500,
-  prizesDelivered: 1250,
-  prizesRemainingCount: 750, // Count for activity section
-  hourlySalesData: [
-    { time: "00h-03h", averageSales: 1500 },
-    { time: "03h-06h", averageSales: 1000 },
-    { time: "06h-09h", averageSales: 2500 },
-    { time: "09h-12h", averageSales: 4000 },
-    { time: "12h-15h", averageSales: 5500 },
-    { time: "15h-18h", averageSales: 7000 },
-    { time: "18h-21h", averageSales: 8500 },
-    { time: "21h-00h", averageSales: 6000 },
-  ],
-}
-
-// Mock data for daily revenue chart
-const mockDailyRevenueData = [
-  { day: "Seg", revenue: 4000 },
-  { day: "Ter", revenue: 3000 },
-  { day: "Qua", revenue: 5000 },
-  { day: "Qui", revenue: 4500 },
-  { day: "Sex", revenue: 6000 },
-  { day: "Sáb", revenue: 7500 },
-  { day: "Dom", revenue: 5500 },
-]
 
 const SESSION_TIMEOUT_SECONDS = 3 * 60 // 3 minutes
 const WARNING_THRESHOLD_SECONDS = 60 // 1 minute
 
 export default function AdminDashboardPage() {
   const router = useRouter()
+  const [edicoes, setEdicoes] = useState<Edicao[]>([])
+  const [isLoadingEdicoes, setIsLoadingEdicoes] = useState(true)
+  const [selectedEditionId, setSelectedEditionId] = useState<string>("")
+  const [metrics, setMetrics] = useState<DashboardMetricsType | null>(null)
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false)
 
-  // Verifica autenticação ao carregar a página
+  const loadMetrics = async (edicaoId: string) => {
+    setIsLoadingMetrics(true)
+    try {
+      const data = await dashboardService.getMetricas(edicaoId)
+      setMetrics(data)
+    } catch (error) {
+      console.error('Erro ao carregar métricas:', error)
+    } finally {
+      setIsLoadingMetrics(false)
+    }
+  }
+
+  // Verifica autenticação e carrega edições ao carregar a página
   useEffect(() => {
-    const adminToken = localStorage.getItem('admin_token')
+    console.log('useEffect executando...')
+    const adminToken = adminAuth.getToken()
+    console.log('Token encontrado:', !!adminToken)
+    
     if (!adminToken) {
+      console.log('Redirecionando para login...')
       router.replace('/admin/login')
       return
     }
+
+    const loadEdicoes = async () => {
+      console.log('Iniciando carregamento das edições...')
+      try {
+        const data = await dashboardService.getEdicoes()
+        console.log('Edições carregadas com sucesso:', data)
+        setEdicoes(data)
+        if (data.length > 0) {
+          setSelectedEditionId(data[0].id)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar edições:', error)
+      } finally {
+        setIsLoadingEdicoes(false)
+      }
+    }
+
+    loadEdicoes()
   }, [router])
 
-  const [selectedEditionId, setSelectedEditionId] = useState(
-    mockEditions.find((e) => e.current)?.id || mockEditions[0].id,
-  )
+  useEffect(() => {
+    if (selectedEditionId) {
+      loadMetrics(selectedEditionId)
+    }
+  }, [selectedEditionId])
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(SESSION_TIMEOUT_SECONDS)
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
   const activityTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -83,12 +83,17 @@ export default function AdminDashboardPage() {
     setShowSessionWarning(false)
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (sessionTimerRef.current) clearInterval(sessionTimerRef.current)
     if (activityTimerRef.current) clearInterval(activityTimerRef.current)
-    // Simulate API logout
-    console.log("Admin logged out due to inactivity or explicit action.")
-    router.push("/") // Changed from "/admin/login" to "/"
+    
+    try {
+      await adminAuth.logout()
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error)
+      // Mesmo com erro, redireciona para login
+      router.replace('/admin/login')
+    }
   }
 
   // Session Timer Effect
@@ -124,15 +129,15 @@ export default function AdminDashboardPage() {
   }
 
   const currentEdition =
-    mockEditions.find((e) => e.current)?.name.split(" – ")[0] || mockEditions[0].name.split(" – ")[0]
+    edicoes.find((e) => e.id === selectedEditionId)?.nome || "Carregando..."
 
   return (
-    <div className="flex min-h-screen bg-[#0D1117] text-white">
+    <div className="flex min-h-screen text-white">
       {/* Mobile Header */}
-      <AdminHeaderMobile onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
+      <AdminHeaderMobile onLogout={handleLogout} />
 
-      {/* Sidebar (Desktop fixed, Mobile overlay) */}
-      <AdminSidebar sessionTimeRemaining={sessionTimeRemaining} onLogout={handleLogout} />
+      {/* Sidebar (Desktop fixed) */}
+      <AdminSidebar onLogout={handleLogout} />
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 lg:p-8 overflow-y-auto pt-20 lg:pt-6 lg:ml-64">
@@ -151,46 +156,65 @@ export default function AdminDashboardPage() {
               <Badge className="bg-[#9FFF00] text-black font-semibold px-3 py-1 rounded-full">
                 Edição Atual: {currentEdition}
               </Badge>
-              <Select value={selectedEditionId} onValueChange={setSelectedEditionId}>
+              <Select 
+                value={selectedEditionId} 
+                onValueChange={setSelectedEditionId}
+                disabled={isLoadingEdicoes}
+              >
                 <SelectTrigger className="w-[320px] bg-[#1A2430] border-[#9FFF00]/20 text-white h-12">
-                  <SelectValue placeholder="Selecionar Edição" />
+                  <SelectValue placeholder={isLoadingEdicoes ? "Carregando edições..." : "Selecionar Edição"} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1A2430] text-white border-[#9FFF00]/20">
-                  {mockEditions.map((edition) => (
-                    <SelectItem key={edition.id} value={edition.id}>
-                      {edition.name}
+                  {edicoes.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      {isLoadingEdicoes ? "Carregando..." : "Nenhuma edição encontrada"}
                     </SelectItem>
-                  ))}
+                  ) : (
+                    edicoes.map((edicao) => {
+                      const dataInicio = new Date(edicao.data_inicio).toLocaleDateString('pt-BR')
+                      const dataFim = new Date(edicao.data_fim).toLocaleDateString('pt-BR')
+                      return (
+                        <SelectItem key={edicao.id} value={edicao.id}>
+                          {`${edicao.nome} (${dataInicio} até ${dataFim})`}
+                        </SelectItem>
+                      )
+                    })
+                  )}
                 </SelectContent>
               </Select>
             </div>
           </div>
         </section>
         {/* Metrics Section */}
-        <DashboardMetrics
-          totalRevenue={mockMetrics.totalRevenue}
-          totalPrizeValue={mockMetrics.totalPrizeValue}
-          prizesRemaining={mockMetrics.prizesRemaining}
-          weeklyParticipants={mockMetrics.weeklyParticipants}
-        />
-        <div className="my-8"></div> {/* Espaçamento */}
-        {/* Gráficos de Receita e Vendas por Horário */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <DailyRevenueChart data={mockDailyRevenueData} />
-          <HourlySalesChart data={mockMetrics.hourlySalesData} />
-        </section>
-        <div className="my-8"></div> {/* Espaçamento */}
-        {/* Activity Section */}
-        <DashboardActivity
-          tokensGenerated={mockMetrics.tokensGenerated}
-          tokensUsed={mockMetrics.tokensUsed}
-          scratchCardsPlayed={mockMetrics.scratchCardsPlayed}
-          prizesDelivered={mockMetrics.prizesDelivered}
-          prizesRemainingCount={mockMetrics.prizesRemainingCount}
-        />
-        <div className="my-8"></div> {/* Espaçamento */}
-        {/* Prize Goal Section */}
-        <DashboardPrizeGoal totalRevenue={mockMetrics.totalRevenue} />
+        {metrics && (
+          <>
+            <DashboardMetrics
+              totalRevenue={metrics.receita_total}
+              totalPrizeValue={metrics.premio_total_distribuido}
+              prizesRemaining={metrics.premios_a_distribuir}
+              weeklyParticipants={metrics.total_participantes}
+              soldTickets={metrics.titulos_vendidos}
+            />
+            <div className="my-8"></div> {/* Espaçamento */}
+            {/* Gráficos de Receita e Vendas por Horário */}
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <DailyRevenueChart 
+                data={metrics.receita_diaria.map(item => ({
+                  day: new Date(item.data).toLocaleDateString('pt-BR', { weekday: 'short' }),
+                  revenue: item.receita
+                }))} 
+              />
+              <HourlySalesChart 
+                data={metrics.vendas_por_horario.map(item => ({
+                  time: `${item.hora.toString().padStart(2, '0')}h`,
+                  averageSales: item.quantidade
+                }))}
+              />
+            </section>
+          </>
+        )}
+
+
       </main>
     </div>
   )

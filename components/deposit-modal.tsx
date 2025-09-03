@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { useState, useEffect, useRef } from "react" // Importar useRef
 import Image from "next/image"
 import { Copy, Check } from "lucide-react"
-import Cookies from 'js-cookie'
 import { api } from '@/services/api';
 
 interface DepositModalProps {
@@ -215,14 +214,10 @@ export default function DepositModal({ isOpen, onClose, onDepositSuccess }: Depo
     setError(null)
 
     try {
-      const token = Cookies.get('access_token')
-      if (!token) {
-        throw new Error('Usuário não autenticado')
-      }
-
       const response = await api.post('/api/sorteio/comprar', {
-        quantidade: calculatedDetails.quantity,
-        valor_total: calculatedDetails.finalPrice.toFixed(2)
+        quantidade_numeros: calculatedDetails.quantity,
+        valor_unitario: TITULO_COST,
+        edicao_sorteio_id: null
       });
 
       const data = response.data;
@@ -260,7 +255,7 @@ export default function DepositModal({ isOpen, onClose, onDepositSuccess }: Depo
           <DialogTitle className="text-2xl font-bold text-center text-[#9ffe00]">Comprar Títulos</DialogTitle>
           <DialogDescription className="text-center text-gray-400 mt-2">
             {currentStep === "selectAmount"
-              ? "Compre suas Raspadinhas e concorra também aos sorteios semanais."
+              ? "Compre, raspe ou gire e concorra também aos sorteios semanais."
               : "Escaneie o QR Code ou use o código PIX para pagar."}
           </DialogDescription>
         </DialogHeader>

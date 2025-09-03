@@ -49,6 +49,15 @@ export default function LotteryEditionsTable({
     }
   }
 
+  // Funções para verificar permissões baseadas no status
+  const canEdit = (status: LotteryEditionStatus) => {
+    return status === "futuro"
+  }
+
+  const canDelete = (status: LotteryEditionStatus) => {
+    return status === "futuro"
+  }
+
   const [isTicketsModalOpen, setIsTicketsModalOpen] = useState(false)
   const [selectedEditionForTickets, setSelectedEditionForTickets] = useState<{
     id: string
@@ -138,7 +147,13 @@ export default function LotteryEditionsTable({
                       variant="ghost"
                       size="sm"
                       onClick={() => onEdit(edition)}
-                      className="text-gray-400 hover:text-[#9FFF00] hover:bg-transparent"
+                      disabled={!canEdit(edition.status)}
+                      className={cn(
+                        "hover:bg-transparent",
+                        canEdit(edition.status)
+                          ? "text-gray-400 hover:text-[#9FFF00]"
+                          : "text-gray-600 cursor-not-allowed opacity-50"
+                      )}
                     >
                       <Edit className="h-4 w-4" />
                       <span className="sr-only">Editar</span>
@@ -158,7 +173,13 @@ export default function LotteryEditionsTable({
                       variant="ghost"
                       size="sm"
                       onClick={() => onDelete(edition.id)}
-                      className="text-red-400 hover:text-red-500 hover:bg-transparent"
+                      disabled={!canDelete(edition.status)}
+                      className={cn(
+                        "hover:bg-transparent",
+                        canDelete(edition.status)
+                          ? "text-red-400 hover:text-red-500"
+                          : "text-gray-600 cursor-not-allowed opacity-50"
+                      )}
                     >
                       <Trash2 className="h-4 w-4" />
                       <span className="sr-only">Excluir</span>

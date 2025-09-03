@@ -33,7 +33,6 @@ import {
 } from "@/lib/notification"
 import type { Notification, NotificationTargetType } from "@/types/notification"
 import NotificationForm from "@/components/admin/notification-form"
-import { deleteNotification as deleteNotificationApi } from "@/services/api"
 import DeleteNotificationDialog from "@/components/admin/delete-notification-dialog"
 
 type NotificationStatusFilter = "all" | "active" | "inactive"
@@ -91,7 +90,7 @@ export default function AdminNotificationsPage() {
     
     try {
       setLoading(true);
-      await deleteNotificationApi(deletingNotification.id);
+      await deleteNotification(deletingNotification.id);
       await fetchNotifications();
     } catch (err) {
       setError("Falha ao excluir notificação. Por favor, tente novamente.");
@@ -162,7 +161,7 @@ export default function AdminNotificationsPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#191F26]">
+    <div className="flex min-h-screen">
       <AdminSidebar sessionTimeRemaining={sessionTimeRemaining} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col lg:ml-64">
         <header className="flex items-center justify-between p-4 border-b border-[#9FFF00]/10 bg-[#1A2430] lg:hidden">
@@ -255,17 +254,6 @@ export default function AdminNotificationsPage() {
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-white text-lg max-w-[80%] truncate">{notification.title}</CardTitle>
-                        {notification.is_active ? (
-                          <span className="flex items-center text-green-400 text-sm">
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Ativa
-                          </span>
-                        ) : (
-                          <span className="flex items-center text-red-400 text-sm">
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Inativa
-                          </span>
-                        )}
                       </div>
                       <div className="flex space-x-2">
                         <Button
@@ -296,9 +284,7 @@ export default function AdminNotificationsPage() {
                         )}
                       </div>
                       <span className="mx-2">•</span>
-                      {format(new Date(notification.created_at), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", {
-                        locale: ptBR,
-                      })}
+                      {notification.date} às {notification.time}
                     </div>
                   </CardHeader>
                   <CardContent className="text-gray-300">{notification.message}</CardContent>

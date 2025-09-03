@@ -1,17 +1,18 @@
 "use client"
 
-import { motion } from "framer-motion"
+import { motion, useInView } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CreditCard, Coins, CheckCircle, Heart } from "lucide-react"
 import Link from "next/link"
+import { useRef, useEffect } from "react"
 
 const steps = [
   {
     icon: CreditCard,
     title: "Compre suas chances para raspar e girar",
     description:
-      "Adquira chances duplas: uma para a raspadinha e outra para o Gira‑Gira do Dom Ripo, gerando números de sorte para concorrer ao sorteio mensal.",
+      "Adquira chances duplas: uma para a raspadinha e outra para o Gira‑Gira do Dom Ripo, gerando números de sorte para concorrer ao sorteio semanal.",
   },
   {
     icon: Coins,
@@ -21,9 +22,9 @@ const steps = [
   },
   {
     icon: CheckCircle,
-    title: "Concorra ao sorteio mensal",
+    title: "Concorra ao sorteio semanal",
     description:
-      "Seus números de sorte entram automaticamente no grande sorteio mensal com prêmios incríveis.",
+      "Seus números de sorte entram automaticamente no grande sorteio semanal com prêmios incríveis.",
   },
   {
     icon: Heart,
@@ -57,9 +58,42 @@ const itemVariants = {
 }
 
 export default function HowItWorksSection() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const isInView = useInView(sectionRef, { once: false, amount: 0.1 })
+
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isInView) {
+        videoRef.current.play().catch((error) => console.error("Video play failed:", error))
+      } else {
+        videoRef.current.pause()
+      }
+    }
+  }, [isInView])
+
   return (
-    <section className="w-full py-12 md:py-20 lg:py-24 bg-gradient-to-b from-gray-900 to-gray-950 text-white">
-      <div className="container px-4 md:px-6">
+    <section ref={sectionRef} className="w-full py-12 md:py-20 lg:py-24 relative text-white overflow-hidden">
+      {/* Vídeo de fundo com filtro escuro */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden">
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          loop
+          muted
+          playsInline
+          preload="auto"
+        >
+          <source
+            src="https://kvwnpmdhyhrmfpgnojbh.supabase.co/storage/v1/object/public/raspepix/videos/how_it_works_dance.mp4"
+            type="video/mp4"
+          />
+        </video>
+        {/* Filtro escuro */}
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
+      
+      <div className="container px-4 md:px-6 relative z-10">
         <motion.div
           className="flex flex-col items-center justify-center space-y-4 text-center mb-8"
           initial="hidden"
@@ -77,7 +111,7 @@ export default function HowItWorksSection() {
             className="max-w-[700px] text-gray-300 md:text-lg"
             variants={itemVariants}
           >
-            Ganhe na raspadinha e no Gira‑Gira do Dom Ripo – número de sorte para o sorteio mensal.
+            Ganhe na raspadinha e no Gira‑Gira do Dom Ripo – número de sorte para o sorteio semanal.
           </motion.p>
         </motion.div>
 

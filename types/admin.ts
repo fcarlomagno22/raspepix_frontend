@@ -9,6 +9,7 @@ export type InstitutionalSettings = {
 export type Role = "Administrador" | "Gestão" | "Financeiro" | "Suporte"
 
 export type PagePermission =
+  | "*"
   | "dashboard"
   | "clientes"
   | "auditoria"
@@ -18,6 +19,14 @@ export type PagePermission =
   | "afiliados"
   | "hq"
   | "configuracoes"
+  | "financeiro"
+  | "sorteio"
+  | "marketing"
+  | "playlist"
+  | "notificacoes"
+  | "suporte"
+  | "logs_auditoria"
+  | "raspadinhas"
 
 export type AdminUser = {
   id: string

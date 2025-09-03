@@ -18,7 +18,7 @@ export default function PrizesSection() {
   }
 
   return (
-    <section className="relative py-16 md:py-24 bg-gradient-to-br from-gray-900 to-gray-950 overflow-hidden">
+    <section className="hidden relative py-16 md:py-24 bg-gradient-to-br from-gray-900 to-gray-950 overflow-hidden">
       {/* Overlay de Grade */}
       <div
         className="absolute inset-0 z-0 opacity-10"

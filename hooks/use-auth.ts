@@ -1,101 +1,86 @@
-import { useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { api, getErrorMessage } from '@/services/api';
+import { API_CONFIG } from '@/config/api';
 import Cookies from 'js-cookie';
 
-function isTokenExpired(token: string | undefined): boolean {
-  if (!token) return true;
-  
-  try {
-    const tokenParts = token.split('.');
-    if (tokenParts.length !== 3) return true;
-
-    const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
-    const exp = payload.exp;
-    
-    if (!exp) return true;
-
-    return Date.now() >= exp * 1000;
-  } catch {
-    return true;
-  }
+interface User {
+  id: string;
+  name: string;
+  email: string;
 }
 
-function clearAllCookies() {
-  // Remove usando js-cookie
-  Cookies.remove('access_token', { path: '/' });
-  Cookies.remove('refresh_token', { path: '/' });
-  Cookies.remove('user', { path: '/' });
-  Cookies.remove('admin_token', { path: '/' });
-
-  // Remove também usando document.cookie para garantir
-  document.cookie = 'access_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-  document.cookie = 'refresh_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-  document.cookie = 'user=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-  document.cookie = 'admin_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-
-  // Remove do localStorage também
-  localStorage.removeItem('admin_token');
-  localStorage.removeItem('admin_user');
+interface LoginData {
+  email: string;
+  password: string;
 }
 
-export function useAuth(isAdmin: boolean = false) {
+interface AuthResponse {
+  user: User;
+  message: string;
+}
+
+export function useAuth(isAdmin: boolean = false, skipAuthCheck: boolean = false) {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    function checkAuth() {
-      if (isAdmin) {
-        // Verifica autenticação de admin
-        const adminToken = Cookies.get('admin_token');
-        if (!adminToken || isTokenExpired(adminToken)) {
-          clearAllCookies();
-          router.replace('/admin/login');
-          return false;
-        }
-        return true;
-      } else {
-        // Verifica autenticação de usuário normal
-        const token = Cookies.get('access_token');
-        if (!token || isTokenExpired(token)) {
-          clearAllCookies();
-          router.replace('/login');
-          return false;
-        }
-        return true;
-      }
+    if (skipAuthCheck) return;
+
+    const token = isAdmin ? Cookies.get('admin_token') : Cookies.get('access_token');
+    if (!token) {
+      router.replace(isAdmin ? '/admin/login' : '/login');
     }
+  }, [router, isAdmin, skipAuthCheck]);
 
-    // Verifica imediatamente
-    checkAuth();
+  const login = useCallback(async (data: LoginData) => {
+    try {
+      setLoading(true);
+      setError(null);
 
-    // Configura um timer para verificar a cada 5 segundos
-    const interval = setInterval(checkAuth, 5000);
-
-    // Adiciona listener para mudanças de foco da janela
-    const handleFocus = () => checkAuth();
-    window.addEventListener('focus', handleFocus);
-
-    // Adiciona listener para mudanças de cookies
-    const handleCookieChange = () => {
-      const isAuthenticated = checkAuth();
-      if (!isAuthenticated) {
-        clearInterval(interval);
-      }
-    };
-    
-    // Verifica mudanças nos cookies a cada 1 segundo
-    const cookieInterval = setInterval(handleCookieChange, 1000);
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(cookieInterval);
-      window.removeEventListener('focus', handleFocus);
-    };
+      const endpoint = isAdmin ? API_CONFIG.ENDPOINTS.AUTH.ADMIN_LOGIN : API_CONFIG.ENDPOINTS.AUTH.LOGIN;
+      const response = await api.post<AuthResponse>(endpoint, data);
+      
+      const { user } = response.data;
+      setUser(user);
+      router.push(isAdmin ? '/admin/dashboard' : '/home');
+    } catch (err) {
+      setError(getErrorMessage(err));
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }, [router, isAdmin]);
 
-  const logout = () => {
-    clearAllCookies();
-    router.replace(isAdmin ? '/admin/login' : '/login');
-  };
+  const logout = useCallback(async () => {
+    try {
+      setLoading(true);
+      const endpoint = isAdmin ? API_CONFIG.ENDPOINTS.AUTH.ADMIN_LOGOUT : API_CONFIG.ENDPOINTS.AUTH.LOGOUT;
+      await api.post(endpoint);
+      setUser(null);
+      
+      if (isAdmin) {
+        Cookies.remove('admin_token');
+        router.push('/admin/login');
+      } else {
+        Cookies.remove('access_token');
+        router.push('/login');
+      }
+    } catch (err) {
+      console.error('Erro ao fazer logout:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [router, isAdmin]);
 
-  return { logout };
+  return {
+    user,
+    loading,
+    error,
+    login,
+    logout
+  };
 } 

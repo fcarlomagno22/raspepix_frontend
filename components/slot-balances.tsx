@@ -2,25 +2,19 @@
 
 import Image from "next/image"
 import { motion } from "framer-motion"
+import { useCarteiraPremios } from "@/hooks/use-carteira-premios"
 
 // Atualize a interface SlotBalancesProps para incluir currentMultiplier
 interface SlotBalancesProps {
   gameChips: number // Fichas para jogar
-  saldoSacavel: number // Saldo para sacar
-  currentMultiplier: number // Nova prop para o multiplicador
-  // Removendo chipsToNextLevel e maxMultiplier daqui
-  // chipsToNextLevel: number // Fichas restantes para o próximo nível do multiplicador
-  // maxMultiplier: number // Multiplicador máximo
+  currentMultiplier: number // Multiplicador atual
 }
 
 export function SlotBalances({
   gameChips,
-  saldoSacavel,
   currentMultiplier,
-  // Removendo chipsToNextLevel e maxMultiplier daqui
-  // chipsToNextLevel,
-  // maxMultiplier,
 }: SlotBalancesProps) {
+  const { saldo: saldoSacavel, isLoading: isLoadingSaldo } = useCarteiraPremios()
   return (
     <motion.div
       className="relative z-20 mt-4 p-2 bg-black bg-opacity-70 rounded-lg border border-yellow-500 shadow-md
@@ -60,9 +54,9 @@ export function SlotBalances({
             <motion.span
               className="text-xs text-yellow-300 font-semibold"
               initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: [1, 1.1, 1], textShadow: "0 0 8px rgba(255,255,0,0.7)" }}
+              animate={{ opacity: 1, scale: 1.1, textShadow: "0 0 8px rgba(255,255,0,0.7)" }}
               transition={{
-                duration: 0.8,
+                duration: 0.4,
                 repeat: Number.POSITIVE_INFINITY,
                 repeatType: "reverse",
                 ease: "easeInOut",

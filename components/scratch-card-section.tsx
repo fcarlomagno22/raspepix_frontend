@@ -134,7 +134,7 @@ export default function ScratchCardSection({
                 src={imageUrl || scratchCards[0].image_url || "/placeholder.svg"}
                 alt={scratchCards[0].name}
                 fill
-                sizes="100vw"
+                sizes="(max-width: 768px) 100vw, 36rem"
                 style={{ objectFit: "contain", transform: `scale(${imageScale || 1})` }}
                 priority
               />

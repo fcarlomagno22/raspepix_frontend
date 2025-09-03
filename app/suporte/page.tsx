@@ -51,7 +51,7 @@ const renderStatusIndicator = (status: string) => {
 
 export default function SuportePage() {
   // Verifica autenticação
-  useAuth();
+  useAuth(false, true);
 
   const [showNewTicketForm, setShowNewTicketForm] = useState(false)
   const [tickets, setTickets] = useState<Ticket[]>([])
@@ -183,7 +183,7 @@ export default function SuportePage() {
                 Tentar Novamente
               </Button>
             </div>
-          ) : (Array.isArray(tickets) && tickets.length === 0) ? (
+          ) : (!tickets || tickets.length === 0) ? (
             <div className="text-center py-8 text-gray-400">
               <p>Nenhum ticket encontrado</p>
             </div>
@@ -216,6 +216,14 @@ export default function SuportePage() {
                             <span className="mx-2">•</span>
                             <span className="text-[#9FFF00]/70">
                               Atendente: {ticket.atendente}
+                            </span>
+                          </>
+                        )}
+                        {ticket.mensagens_nao_lidas > 0 && (
+                          <>
+                            <span className="mx-2">•</span>
+                            <span className="bg-[#9FFF00] text-black px-2 py-0.5 rounded-full font-medium">
+                              {ticket.mensagens_nao_lidas} {ticket.mensagens_nao_lidas === 1 ? 'nova mensagem' : 'novas mensagens'}
                             </span>
                           </>
                         )}

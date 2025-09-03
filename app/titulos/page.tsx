@@ -12,25 +12,33 @@ import { motion } from "framer-motion"
 import { getTitulos, type Titulo } from "@/services/titulos"
 import { useQuery } from "@tanstack/react-query"
 import { Skeleton } from "@/components/ui/skeleton"
+import { api } from "@/services/api"
 
-// Interface Edition (copiada de ganhadores/page.tsx)
 interface Edition {
   id: string
-  name: string
-  startDate: string // YYYY-MM-DD
-  endDate: string // YYYY-MM-DD
+  nome: string
+  data_inicio: string
+  data_fim: string
+  status: string
+  valor_sorteio: number
+  valor_premios_instantaneos: number
+  criado_em: string
+  atualizado_em: string
+  configuracoes_premios: any
 }
 
-// Mock de Edições (copiado de ganhadores/page.tsx)
-const mockEditions: Edition[] = [
-  { id: "all", name: "Todas as Edições", startDate: "2023-01-01", endDate: "2025-12-31" },
-  { id: "1", name: "Edição 1", startDate: "2024-01-01", endDate: "2024-01-31" },
-  { id: "2", name: "Edição 2", startDate: "2024-02-01", endDate: "2024-02-29" },
-  { id: "3", name: "Edição 3", startDate: "2024-03-01", endDate: "2024-03-31" },
-  { id: "4", name: "Edição 4", startDate: "2024-04-01", endDate: "2024-04-30" },
-  { id: "5", name: "Edição 5", startDate: "2024-05-01", endDate: "2024-05-31" },
-  { id: "6", name: "Edição 6", startDate: "2024-06-01", endDate: "2024-06-30" },
-]
+const ALL_EDITIONS_OPTION = {
+  id: "all",
+  nome: "Todas as Edições",
+  data_inicio: "",
+  data_fim: "",
+  status: "",
+  valor_sorteio: 0,
+  valor_premios_instantaneos: 0,
+  criado_em: "",
+  atualizado_em: "",
+  configuracoes_premios: null
+}
 
 // Formatação de data para o Select de Edições
 const formatDateForEdition = (dateString: string) => {
@@ -62,11 +70,15 @@ function CupomCard({ titulo }: { titulo: Titulo }) {
 
   return (
     <div className={`relative rounded-lg p-4 border transition-all ${cardClasses}`}>
-      {/* Badge de Contemplado */}
-      {titulo.contemplado && (
+      {/* Badge de Contemplado ou Pagamento Pendente */}
+      {titulo.contemplado && (titulo.tipo === "sorteio" || (titulo.tipo === "raspadinha" && titulo.utilizado)) ? (
         <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black px-3 py-1 rounded-full text-xs font-bold border-2 border-yellow-300 shadow-lg flex items-center gap-1">
           <Trophy className="h-3 w-3" />
           Contemplado
+        </div>
+      ) : titulo.tipo === "sorteio" && !titulo.ativo && (
+        <div className="absolute -top-2 -right-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white px-3 py-1 rounded-full text-xs font-bold border-2 border-orange-500 shadow-lg">
+          Confirmação de Pagamento Pendente
         </div>
       )}
 
@@ -89,7 +101,14 @@ function CupomCard({ titulo }: { titulo: Titulo }) {
       <div className="text-center mb-4">
         <p className={`text-3xl font-black tracking-wider ${numberColorClass}`}>{titulo.numero}</p>
         {titulo.contemplado && titulo.valorPremio && (
-          <p className="mt-2 text-yellow-400 font-bold text-lg">{titulo.valorPremio}</p>
+          titulo.tipo === "sorteio" || (titulo.tipo === "raspadinha" && titulo.utilizado) ? (
+            <p className="mt-2 text-yellow-400 font-bold text-lg">
+              {`R$ ${Number(titulo.valorPremio).toLocaleString('pt-BR', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+              })}`}
+            </p>
+          ) : null
         )}
       </div>
 
@@ -126,11 +145,31 @@ function CupomCard({ titulo }: { titulo: Titulo }) {
 }
 
 export default function MyTitlesPage() {
+  const [mounted, setMounted] = useState(false)
   const [selectedEditionId, setSelectedEditionId] = useState("all")
   const [selectedTab, setSelectedTab] = useState("todos")
   const [page, setPage] = useState(1)
 
-  const { data: titulosResponse, isLoading, error } = useQuery({
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Buscar edições
+  const { data: editions = [], isLoading: isLoadingEditions } = useQuery({
+    queryKey: ['edicoes'],
+    queryFn: async () => {
+      try {
+        const response = await api.get<Edition[]>('/api/sorteio/edicoes')
+        return [ALL_EDITIONS_OPTION, ...response.data]
+      } catch (error) {
+        console.error('Erro ao buscar edições:', error)
+        return [ALL_EDITIONS_OPTION]
+      }
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutos
+  })
+
+  const { data: titulosResponse, isLoading: isLoadingTitulos, error } = useQuery({
     queryKey: ["titulos", selectedEditionId, selectedTab, page],
     queryFn: () => getTitulos({
       edicao_id: selectedEditionId === "all" ? undefined : selectedEditionId,
@@ -143,6 +182,19 @@ export default function MyTitlesPage() {
 
   const titulos = titulosResponse?.data || [];
   const meta = titulosResponse?.meta;
+
+  if (!mounted) {
+    return (
+      <AuthenticatedLayout>
+        <main className="flex-1 pt-4 pb-24 px-4 max-w-md mx-auto w-full">
+          <div className="text-center py-10">
+            <Gift className="h-12 w-12 text-gray-500 mx-auto mb-3" />
+            <p className="text-gray-400 mb-6">Carregando...</p>
+          </div>
+        </main>
+      </AuthenticatedLayout>
+    )
+  }
 
   return (
     <AuthenticatedLayout>
@@ -163,11 +215,11 @@ export default function MyTitlesPage() {
               <SelectValue placeholder="Selecionar edição" />
             </SelectTrigger>
             <SelectContent className="bg-[#191F26] text-white border-gray-700">
-              {mockEditions.map((edition) => (
+              {editions?.map((edition) => (
                 <SelectItem key={edition.id} value={edition.id}>
-                  {edition.id === "all"
-                    ? edition.name
-                    : `${edition.name} - ${formatDateForEdition(edition.startDate)} até ${formatDateForEdition(edition.endDate)}`}
+                  {edition.id === "all" ? "Todas as Edições" : (
+                    `${edition.nome} (${format(new Date(edition.data_inicio), "dd/MM/yyyy")} - ${format(new Date(edition.data_fim), "dd/MM/yyyy")})`
+                  )}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -201,16 +253,11 @@ export default function MyTitlesPage() {
           </TabsList>
         </Tabs>
 
-        {isLoading ? (
+        {isLoadingTitulos || isLoadingEditions ? (
           // Loading state
-          <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="bg-gray-800 rounded-lg p-4 animate-pulse">
-                <div className="h-6 bg-gray-700 rounded w-1/3 mb-4" />
-                <div className="h-8 bg-gray-700 rounded w-2/3 mb-4" />
-                <div className="h-4 bg-gray-700 rounded w-1/2" />
-              </div>
-            ))}
+          <div className="text-center py-10">
+            <Gift className="h-12 w-12 text-gray-500 mx-auto mb-3" />
+            <p className="text-gray-400 mb-6">Carregando seus números...</p>
           </div>
         ) : error ? (
           // Error state
@@ -257,7 +304,7 @@ export default function MyTitlesPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1 || isLoading}
+                  disabled={page === 1 || isLoadingTitulos}
                 >
                   Anterior
                 </Button>
@@ -268,7 +315,7 @@ export default function MyTitlesPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
-                  disabled={page === meta.totalPages || isLoading}
+                  disabled={page === meta.totalPages || isLoadingTitulos}
                 >
                   Próxima
                 </Button>

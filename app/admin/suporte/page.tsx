@@ -147,7 +147,7 @@ export default function AdminSupportPage() {
   const isLoading = !mounted || queryLoading
 
   return (
-    <div className="flex min-h-screen bg-[#0B111B] text-white">
+    <div className="flex min-h-screen text-white">
       <AdminSidebar />
       <main className="flex-1 p-6 lg:ml-64">
         <h1 className="text-2xl font-bold text-white mb-6">Suporte</h1>

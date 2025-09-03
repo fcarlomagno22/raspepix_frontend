@@ -70,7 +70,7 @@ export default function WeeklyLotterySection() {
             className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight drop-shadow-lg"
             variants={itemVariants}
           >
-            Não ganhou na raspadinha?{" "}
+            Não ganhou na raspadinha nem no Gira-Gira do Dom Ripo?{" "}
             <span className="text-yellow-400 inline-block animate-text-glow-yellow">Relaxa!</span>
           </motion.h2>
           <motion.p

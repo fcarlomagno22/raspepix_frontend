@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Bell, Trash2, CheckCheck, X, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react"
+import { Bell, Trash2, CheckCheck, X, AlertTriangle, ChevronLeft, ChevronRight, Headphones } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -19,9 +19,9 @@ import {
 import { formatDate } from "@/lib/utils"
 import { useMobile } from "@/hooks/use-mobile"
 import AuthenticatedLayout from "@/components/authenticated-layout"
-import { getUserNotifications, hideNotification, markNotificationAsRead } from "@/services/api"
 import { useToast } from "@/hooks/use-toast"
 import { DialogClose } from "@/components/ui/dialog"
+import { getUserNotifications, hideNotification } from "@/services/api"
 
 // Define a interface para uma notificação
 interface Notification {
@@ -54,16 +54,15 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const fetchNotifications = async () => {
+      setIsLoading(true)
       try {
-        setIsLoading(true)
         const response = await getUserNotifications(currentPage)
         setNotifications(response.notifications)
         setTotalPages(response.totalPages)
       } catch (error) {
-        console.error('Erro ao carregar notificações:', error)
         toast({
           title: "Erro",
-          description: "Não foi possível carregar suas notificações. Por favor, tente novamente.",
+          description: "Não foi possível carregar as notificações",
           variant: "destructive",
         })
       } finally {
@@ -86,19 +85,20 @@ export default function NotificationsPage() {
 
   const markAsRead = async (id: string) => {
     try {
-      const updatedNotification = await markNotificationAsRead(id);
-      setNotifications((prev) => prev.map((notif) => (notif.id === id ? updatedNotification : notif)));
-      setSelectedNotifications((prev) => prev.filter((notifId) => notifId !== id));
+      setNotifications((prev) => 
+        prev.map((notif) => 
+          notif.id === id ? { ...notif, read: true } : notif
+        )
+      );
       toast({
         title: "Sucesso",
         description: "Notificação marcada como lida",
         variant: "default",
       });
     } catch (error) {
-      console.error('Erro ao marcar notificação como lida:', error);
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : 'Erro ao marcar notificação como lida',
+        description: "Erro ao marcar notificação como lida",
         variant: "destructive",
       });
     }
@@ -106,27 +106,21 @@ export default function NotificationsPage() {
 
   const markSelectedAsRead = async () => {
     try {
-      const promises = selectedNotifications.map(id => markNotificationAsRead(id));
-      const updatedNotifications = await Promise.all(promises);
-      
-    setNotifications((prev) =>
-        prev.map((notif) => {
-          const updated = updatedNotifications.find(n => n.id === notif.id);
-          return updated || notif;
-        })
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          selectedNotifications.includes(notif.id) ? { ...notif, read: true } : notif
+        )
       );
       setSelectedNotifications([]);
-      
       toast({
         title: "Sucesso",
         description: "Notificações marcadas como lidas",
         variant: "default",
       });
     } catch (error) {
-      console.error('Erro ao marcar notificações como lidas:', error);
       toast({
         title: "Erro",
-        description: 'Erro ao marcar notificações como lidas',
+        description: "Erro ao marcar notificações como lidas",
         variant: "destructive",
       });
     }
@@ -144,18 +138,36 @@ export default function NotificationsPage() {
     setShowDeleteConfirmationModal(true)
   }
 
-  const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((notif) => notif.id !== id))
-    setSelectedNotifications((prev) => prev.filter((notifId) => notifId !== id))
-    setShowDeleteConfirmationModal(false)
-    setNotificationToDelete(null)
+  const deleteNotification = async (id: string) => {
+    try {
+      await hideNotification(id)
+      setNotifications((prev) => prev.filter((notif) => notif.id !== id))
+      setSelectedNotifications((prev) => prev.filter((notifId) => notifId !== id))
+      setShowDeleteConfirmationModal(false)
+      setNotificationToDelete(null)
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir a notificação",
+        variant: "destructive",
+      })
+    }
   }
 
-  const deleteSelectedNotifications = () => {
-    setNotifications((prev) => prev.filter((notif) => !selectedNotifications.includes(notif.id)))
-    setSelectedNotifications([])
-    setShowDeleteConfirmationModal(false)
-    setNotificationToDelete(null)
+  const deleteSelectedNotifications = async () => {
+    try {
+      await Promise.all(selectedNotifications.map(id => hideNotification(id)))
+      setNotifications((prev) => prev.filter((notif) => !selectedNotifications.includes(notif.id)))
+      setSelectedNotifications([])
+      setShowDeleteConfirmationModal(false)
+      setNotificationToDelete(null)
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir algumas notificações",
+        variant: "destructive",
+      })
+    }
   }
 
   const cancelDelete = () => {
@@ -166,26 +178,23 @@ export default function NotificationsPage() {
 
   const executeDelete = async () => {
     try {
-    if (isDeletingMultiple && Array.isArray(notificationToDelete)) {
-        // Por enquanto mantemos o comportamento atual para deleção múltipla
-        deleteSelectedNotifications();
-    } else if (typeof notificationToDelete === "string") {
-        await hideNotification(notificationToDelete);
-        setNotifications((prev) => prev.filter((notif) => notif.id !== notificationToDelete));
-        toast({
-          title: "Sucesso",
-          description: "Notificação removida com sucesso",
-          variant: "default",
-        });
+      if (isDeletingMultiple && Array.isArray(notificationToDelete)) {
+        await deleteSelectedNotifications();
+      } else if (typeof notificationToDelete === "string") {
+        await deleteNotification(notificationToDelete);
       }
+      toast({
+        title: "Sucesso",
+        description: "Notificação removida com sucesso",
+        variant: "default",
+      });
       setShowDeleteConfirmationModal(false);
       setNotificationToDelete(null);
       setIsDeletingMultiple(false);
     } catch (error) {
-      console.error('Erro ao ocultar notificação:', error);
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : 'Erro ao remover notificação',
+        description: "Erro ao remover notificação",
         variant: "destructive",
       });
     }
@@ -205,28 +214,21 @@ export default function NotificationsPage() {
 
   const openNotificationModal = async (notification: Notification) => {
     try {
-      let notificationToShow = notification;
-      
       if (!notification.read) {
-        const updatedNotification = await markNotificationAsRead(notification.id);
-        notificationToShow = updatedNotification;
-        
-        // Atualiza a notificação na lista local
-        setNotifications((prev) => 
-          prev.map((n) => n.id === notification.id ? updatedNotification : n)
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notification.id ? { ...n, read: true } : n
+          )
         );
       }
-      
-      setSelectedNotification(notificationToShow);
+      setSelectedNotification(notification);
       setShowNotificationModal(true);
     } catch (error) {
-      console.error('Erro ao marcar notificação como lida:', error);
       toast({
         title: "Erro",
-        description: 'Erro ao marcar notificação como lida',
+        description: "Erro ao marcar notificação como lida",
         variant: "destructive",
       });
-      // Ainda abre o modal mesmo se der erro ao marcar como lida
       setSelectedNotification(notification);
       setShowNotificationModal(true);
     }
@@ -484,30 +486,34 @@ export default function NotificationsPage() {
               <AlertDialogTitle className="text-xl font-bold text-white">
                 Confirmar Exclusão
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-300 mt-2">
-                      {isDeletingMultiple
-                  ? `Tem certeza que deseja excluir ${selectedNotifications.length} notificações?`
-                        : "Tem certeza que deseja excluir esta notificação?"}
-                <p className="text-sm text-gray-400 mt-2">Esta ação não pode ser desfeita.</p>
-                    </AlertDialogDescription>
+              <AlertDialogDescription>
+                <span className="text-gray-300 mt-2 block">
+                  {isDeletingMultiple
+                    ? `Tem certeza que deseja excluir ${selectedNotifications.length} notificações?`
+                    : "Tem certeza que deseja excluir esta notificação?"}
+                </span>
+                <span className="text-sm text-gray-400 mt-2 block">
+                  Esta ação não pode ser desfeita.
+                </span>
+              </AlertDialogDescription>
             </AlertDialogHeader>
 
             <AlertDialogFooter className="mt-6 space-x-2">
-                    <AlertDialogCancel
-                      onClick={cancelDelete}
+              <AlertDialogCancel
+                onClick={cancelDelete}
                 className="bg-[#191F26] hover:bg-[#191F26]/80 text-white border border-gray-800 hover:border-[#9FFF00]/50 transition-colors mt-0 rounded-lg"
-                    >
-                      Cancelar
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={executeDelete}
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={executeDelete}
                 className="bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 hover:border-red-500 transition-colors rounded-lg"
-                    >
-                      Excluir
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </AuthenticatedLayout>
   )

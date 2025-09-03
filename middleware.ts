@@ -7,50 +7,48 @@ const publicRoutes = [
   '/login',
   '/cadastro',
   '/recuperarsenha',
-  '/admin/login'
+  '/admin/login',
+  '/images',
+  '/favicon.ico',
+  '/manifest.json',
+  '/_next',
+  '/api/auth/login',
+  '/api/admin/login'
 ]
+
+// Verifica se a rota atual é pública
+const isPublicRoute = (path: string) => {
+  return publicRoutes.some(route => path === route || path.startsWith(`${route}/`))
+}
 
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
+  
+  // Ignora rotas da API pois elas são tratadas pelo interceptor do axios
+  if (path.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
   const isAdminPath = path.startsWith('/admin')
-  const isPublicPath = publicRoutes.includes(path)
+  const isPublicPath = isPublicRoute(path)
 
   // Se for uma rota administrativa (exceto login)
   if (isAdminPath && !isPublicPath) {
-    const token = request.cookies.get('admin_token')?.value || ''
+    const adminToken = request.cookies.get('admin_token')?.value
     
-    if (!token) {
-      const url = new URL('/admin/login', request.url)
-      url.searchParams.set('from', request.nextUrl.pathname)
-      return NextResponse.redirect(url)
+    if (!adminToken) {
+      return NextResponse.redirect(new URL('/admin/login', request.url))
     }
 
-    // Adiciona o token no header para a API
-    const response = NextResponse.next()
-    response.headers.set('Authorization', `Bearer ${token}`)
-    return response
+    // Permite a requisição prosseguir com o token
+    return NextResponse.next()
   }
 
-  // Se for uma rota de usuário comum (não pública e não administrativa)
+  // Rotas não-admin
   if (!isPublicPath && !isAdminPath) {
-    const token = request.cookies.get('access_token')?.value || ''
-    
+    const token = request.cookies.get('access_token')?.value
     if (!token) {
       return NextResponse.redirect(new URL('/login', request.url))
-    }
-  }
-
-  // Se estiver logado e tentar acessar uma rota pública
-  if (isPublicPath) {
-    const adminToken = request.cookies.get('admin_token')?.value || ''
-    const userToken = request.cookies.get('access_token')?.value || ''
-    
-    if (path === '/admin/login' && adminToken) {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-    }
-    
-    if (path === '/login' && userToken) {
-      return NextResponse.redirect(new URL('/home', request.url))
     }
   }
 
@@ -59,14 +57,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images (public images)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|images).*)',
-  ],
+    // Exclui rotas estáticas e da API
+    '/((?!api/|_next/static/|_next/image/|favicon.ico).*)'
+  ]
 } 

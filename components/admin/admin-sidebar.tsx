@@ -2,220 +2,207 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { usePathname } from "next/navigation"
-import {
-  LayoutDashboard,
-  Settings,
-  Gift,
-  Users,
-  Network,
-  Megaphone,
-  Ticket,
-  Banknote,
-  Layers,
-  BookOpenText,
-  FileSearch,
-  Bell,
-  Headphones,
+import { 
+  LayoutDashboard, 
+  Users, 
+  DollarSign, 
+  Ticket, 
+  Bell, 
+  Settings, 
+  HelpCircle,
   LogOut,
-  X,
-  ChevronDown,
   Music,
+  BookOpen,
+  FileText,
+  Gamepad2,
+  ChevronDown,
+  Network,
+  Megaphone
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { useState } from "react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { cn } from "@/lib/utils"
-import { adminAuth } from "@/services/auth"
-
-// Definição dos itens do menu
-const menuItems = [
-  { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "Integração", path: "/admin/integracao", icon: Settings },
-  { name: "Portal do Sorteado", path: "/admin/portaldosorteado", icon: Gift },
-  {
-    name: "Usuários", // Item pai expansível
-    icon: Users,
-    children: [
-      { name: "Clientes", path: "/admin/clientes", icon: Users },
-      { name: "Afiliados", path: "/admin/afiliados", icon: Network },
-      { name: "Influencers", path: "/admin/influencers", icon: Megaphone },
-    ],
-  },
-  { name: "Sorteios", path: "/admin/sorteios", icon: Ticket },
-  { name: "Financeiro", path: "/admin/financeiro", icon: Banknote },
-  { name: "Raspadinhas", path: "/admin/raspadinhas", icon: Layers },
-  { name: "Playlist", path: "/admin/playlist", icon: Music },
-  { name: "HQ", path: "/admin/hq", icon: BookOpenText },
-  { name: "Logs de Auditoria", path: "/admin/auditoria", icon: FileSearch },
-  { name: "Notificações", path: "/admin/notificacoes", icon: Bell },
-  { name: "Suporte", path: "/admin/suporte", icon: Headphones },
-  { name: "Configurações", path: "/admin/configuracoes", icon: Settings },
-]
+import { useAudioPlayer } from "@/contexts/audio-player-context"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useAdminPermissions } from "@/hooks/use-admin-permissions"
 
 interface AdminSidebarProps {
-  isOpen: boolean
-  onClose: () => void
+  onLogout: () => void
 }
 
-export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
+export default function AdminSidebar({ onLogout }: AdminSidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { pauseSong } = useAudioPlayer()
+  const { hasPermission, loading } = useAdminPermissions()
 
-  const handleLogout = async () => {
-    try {
-      await adminAuth.logout()
-      router.replace('/admin/login')
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error)
+  const mainNavItems = [
+    { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
+    {
+      type: "dropdown",
+      icon: Users,
+      label: "Usuários",
+      permission: "usuarios",
+      items: [
+        { href: "/admin/clientes", label: "Clientes", permission: "clientes" },
+        { href: "/admin/afiliados", label: "Influencers", permission: "afiliados" },
+      ],
+    },
+    { href: "/admin/financeiro", icon: DollarSign, label: "Financeiro", permission: "financeiro" },
+    { href: "/admin/sorteios", icon: Ticket, label: "Sorteios", permission: "sorteio" },
+    { href: "/admin/portaldosorteado", icon: Gamepad2, label: "Portal do Sorteado", permission: "portaldosorteado" },
+    { href: "/admin/marketing", icon: Megaphone, label: "Marketing", permission: "marketing" },
+    { href: "/admin/hq", icon: BookOpen, label: "HQs", permission: "hq" },
+    { href: "/admin/playlist", icon: Music, label: "Playlist", permission: "playlist" },
+  ]
+
+  const communicationNavItems = [
+    { href: "/admin/notificacoes", icon: Bell, label: "Notificações", permission: "notificacoes" },
+    { href: "/admin/suporte", icon: HelpCircle, label: "Suporte", permission: "suporte" },
+  ]
+
+  const systemNavItems = [
+    { href: "/admin/integracao", icon: Network, label: "Integração", permission: "integracao" },
+    { href: "/admin/auditoria", icon: FileText, label: "Logs de auditoria", permission: "logs_auditoria" },
+  ]
+
+  const renderNavItem = (item: any) => {
+    // Verificar se o usuário tem permissão para este item
+    if (item.permission && !hasPermission(item.permission)) {
+      return null
     }
+
+    if (item.type === "dropdown") {
+      // Para dropdowns, verificar se pelo menos um item filho tem permissão
+      const hasAnyChildPermission = item.items.some((subItem: any) => 
+        !subItem.permission || hasPermission(subItem.permission)
+      )
+      
+      if (!hasAnyChildPermission) {
+        return null
+      }
+
+      const isActive = item.items.some((subItem: any) => pathname === subItem.href)
+      const Icon = item.icon
+
+      return (
+        <DropdownMenu key={item.label}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={`w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                  : "text-gray-400 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className="h-4.5 w-4.5" />
+                {item.label}
+              </div>
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56 bg-[#0D1117] border-white/5">
+            {item.items.map((subItem: any) => {
+              // Verificar permissão para cada item filho
+              if (subItem.permission && !hasPermission(subItem.permission)) {
+                return null
+              }
+              
+              return (
+                <DropdownMenuItem key={subItem.href} asChild>
+                  <Link
+                    href={subItem.href}
+                    className={`w-full px-2 py-1.5 text-sm ${
+                      pathname === subItem.href
+                        ? "text-primary"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {subItem.label}
+                  </Link>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    }
+
+    const Icon = item.icon
+    const isActive = pathname === item.href
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+          isActive
+            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+            : "text-gray-400 hover:bg-white/5 hover:text-white"
+        }`}
+      >
+        <Icon className="h-4.5 w-4.5" />
+        {item.label}
+      </Link>
+    )
   }
 
-  const sidebarContent = (
-    <div className="flex h-full w-full flex-col bg-[#1A2430] border-r border-[#9FFF00]/10 text-white">
-      {/* Header com Logo */}
-      <div className="flex items-center justify-center p-4 border-b border-[#9FFF00]/10 relative">
-        <Image src="/images/raspepix-logo.png" alt="RaspePix Logo" width={120} height={30} priority />
-        {/* Botão X para fechar no mobile */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute right-2 top-1/2 -translate-y-1/2 lg:hidden text-gray-400 hover:bg-transparent hover:text-white"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <X className="h-5 w-5" />
-          <span className="sr-only">Fechar menu</span>
-        </Button>
+  return (
+    <div className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-64 bg-[#131B24] border-r border-white/5 overflow-y-auto">
+      <div className="p-6 flex flex-col items-center border-b border-white/5">
+        <Link href="/admin/dashboard" className="flex flex-col items-center">
+          <Image
+            src="https://kvwnpmdhyhrmfpgnojbh.supabase.co/storage/v1/object/public/raspepix//00%20-%20Logo%20RaspePix.png"
+            alt="RaspePix Logo"
+            width={140}
+            height={50}
+            className="mb-2"
+          />
+          <p className="text-sm font-medium text-gray-400 mt-2">Painel Administrativo</p>
+        </Link>
       </div>
 
-      {/* Informações do Admin */}
-      <div className="p-3 border-b border-[#9FFF00]/10 text-center">
-        <p className="text-sm text-gray-400">Logado como:</p>
-        <p className="font-medium text-[#9FFF00]">Admin RaspePix</p>
-      </div>
+      <nav className="flex-1 px-3 py-4">
+        <div className="space-y-0.5">
+          {mainNavItems.map(renderNavItem)}
+        </div>
 
-      {/* Menu de Navegação */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-        {menuItems.map((item) => {
-          const isActive = pathname === item.path
-          const Icon = item.icon
+        <div className="mt-6 pt-6 border-t border-white/5">
+          <div className="space-y-0.5">
+            {communicationNavItems.map(renderNavItem)}
+          </div>
+        </div>
 
-          if (item.children) {
-            // Renderizar como Collapsible (menu expansível)
-            const isChildActive = item.children.some((child) => pathname === child.path)
-            return (
-              <Collapsible key={item.name} defaultOpen={isChildActive}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className={cn(
-                      "w-full justify-start flex items-center p-3 rounded-lg transition-colors duration-200",
-                      isChildActive
-                        ? "bg-[#9FFF00]/10 text-[#9FFF00]"
-                        : "text-gray-300 hover:bg-[#9FFF00]/5 hover:text-white",
-                    )}
-                  >
-                    <Icon className="h-5 w-5 mr-3 flex-shrink-0" />
-                    <span className="text-sm font-medium truncate">Usuários</span>
-                    <ChevronDown className="ml-auto h-4 w-4 transition-transform data-[state=open]:rotate-180" />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="ml-4 mt-1 space-y-1">
-                  {item.children.map((child) => {
-                    const isChildActive = pathname === child.path
-                    const ChildIcon = child.icon
-                    return (
-                      <Link
-                        key={child.name}
-                        href={child.path}
-                        className={cn(
-                          "flex items-center p-3 rounded-lg transition-colors duration-200",
-                          isChildActive
-                            ? "bg-[#9FFF00]/10 text-[#9FFF00]"
-                            : "text-gray-300 hover:bg-[#9FFF00]/5 hover:text-white",
-                        )}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <ChildIcon className="h-4 w-4 mr-3 flex-shrink-0" />
-                        <span className="text-sm font-medium truncate">{child.name}</span>
-                      </Link>
-                    )
-                  })}
-                </CollapsibleContent>
-              </Collapsible>
-            )
-          } else {
-            // Renderizar como item de menu normal
-            return (
-              <Link
-                key={item.name}
-                href={item.path}
-                className={cn(
-                  "flex items-center p-3 rounded-lg transition-colors duration-200",
-                  isActive ? "bg-[#9FFF00]/10 text-[#9FFF00]" : "text-gray-300 hover:bg-[#9FFF00]/5 hover:text-white",
-                )}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <Icon className="h-5 w-5 mr-3 flex-shrink-0" />
-                <span className="text-sm font-medium truncate">{item.name}</span>
-              </Link>
-            )
-          }
-        })}
+        <div className="mt-6 pt-6 border-t border-white/5">
+          <div className="space-y-0.5">
+            {systemNavItems.map(renderNavItem)}
+          </div>
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-white/5">
+          <div className="space-y-0.5">
+            {renderNavItem({ href: "/admin/configuracoes", icon: Settings, label: "Configurações", permission: "configuracoes" })}
+          </div>
+        </div>
       </nav>
 
-      {/* Rodapé do Sidebar */}
-      <div className="p-4 border-t border-[#9FFF00]/10">
+      <div className="p-4 mt-auto border-t border-white/5">
         <Button
-          onClick={handleLogout}
+          onClick={() => {
+            pauseSong()
+            onLogout()
+          }}
           variant="ghost"
-          className="w-full justify-start text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+          className="w-full justify-start text-sm font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
         >
-          <LogOut className="h-5 w-5 mr-3" />
+          <LogOut className="h-4.5 w-4.5 mr-3" />
           Sair
         </Button>
       </div>
     </div>
-  )
-
-  return (
-    <>
-      {/* Sidebar para Desktop */}
-      <aside className="hidden lg:flex flex-shrink-0 w-64 h-screen transition-all duration-300 ease-in-out fixed inset-y-0 left-0 z-20">
-        {sidebarContent}
-      </aside>
-
-      {/* Sidebar para Mobile (Overlay) */}
-      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-        <SheetTrigger asChild className="lg:hidden">
-          {/* Este trigger será usado no AdminHeaderMobile */}
-          <Button variant="ghost" size="icon" className="text-[#9FFF00]">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-6 w-6"
-            >
-              <line x1="4" x2="20" y1="12" y2="12" />
-              <line x1="4" x2="20" y1="6" y2="6" />
-              <line x1="4" x2="20" y1="18" y2="18" />
-            </svg>
-            <span className="sr-only">Abrir menu</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64 bg-[#1A2430] border-r border-[#9FFF00]/10">
-          {sidebarContent}
-        </SheetContent>
-      </Sheet>
-    </>
   )
 }

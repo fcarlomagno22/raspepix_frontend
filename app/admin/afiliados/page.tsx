@@ -7,234 +7,361 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { Users, DollarSign, Percent, Search, Check, X, ChevronLeft, ChevronRight, Edit, Settings } from "lucide-react"
+import { 
+  Users, 
+  DollarSign, 
+  Percent, 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  Settings,
+  TrendingUp,
+  Gift,
+  Award,
+  Lock,
+  Unlock
+} from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import AdminSidebar from "@/components/admin/admin-sidebar"
 import AdminHeaderMobile from "@/components/admin/admin-header-mobile"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { EditCommissionModal } from "@/components/admin/edit-commission-modal" // Corrected import to named export
+import { EditCommissionModal } from "@/components/admin/edit-commission-modal"
+import { NetworkOverviewAdmin } from "@/components/admin/network-overview-admin"
+import { MarketingResourcesAdmin } from "@/components/admin/marketing-resources-admin"
+import { NetworkTreeView } from "@/components/network/network-tree-view"
+import { NetworkMember, NetworkStats, MarketingResource, CommissionLevel, Influencer, ApiResponse } from "@/types/network"
+import { Promocao } from "@/services/promocoes"
+import { api } from "@/services/api"
+import { Promotion } from "@/components/admin/promotions-manager"
+import { CommissionManager } from "@/components/admin/commission-manager"
+import { PromotionsManager } from "@/components/admin/promotions-manager"
+import { InfluencersNetworkView } from "@/components/admin/influencers-network-view"
 
 // --- MOCK DATA ---
-type Edition = {
-  id: string
-  name: string
-  startDate: string
-  endDate: string
-  current?: boolean
+type ComissaoNivel = {
+  nivel: "direto" | "secundario" | "expandido"
+  percentual: number
 }
 
 type AffiliateProcessed = {
   id: string
-  nome_completo: string
+  nome: string
   is_active: boolean
-  commission_rate: number
-  direct_referrals: number
-  total_deposited: number
-  commission_received: number
+  codigo: string
+  commission_n1: number
+  commission_n2: number
+  commission_n3: number
 }
 
-const mockEditions: Edition[] = [
-  { id: "1", name: "Edição de Verão 2024", startDate: "2024-01-01", endDate: "2024-03-31", current: true },
-  { id: "2", name: "Edição de Inverno 2023", startDate: "2023-06-01", endDate: "2023-08-31" },
-  { id: "3", name: "Edição de Primavera 2023", startDate: "2023-09-01", endDate: "2023-11-30" },
+const mockNetworkStats: NetworkStats[] = [
+  {
+    level: 1,
+    members: 150,
+    revenue: 75000,
+    commissions: 7500,
+    commissionRate: 10,
+  },
+  {
+    level: 2,
+    members: 450,
+    revenue: 225000,
+    commissions: 11250,
+    commissionRate: 5,
+  },
+  {
+    level: 3,
+    members: 1200,
+    revenue: 600000,
+    commissions: 18000,
+    commissionRate: 3,
+  },
 ]
 
-const initialMockAffiliatesData: AffiliateProcessed[] = [
+// Mock data para promoções
+const mockPromotions: Promotion[] = []
+
+// Mock data para comissões por nível
+const mockCommissionLevels: CommissionLevel[] = [
+  { level: 1, percentage: 15, description: "Indicações Diretas" },
+  { level: 2, percentage: 5, description: "Rede Secundária" },
+  { level: 3, percentage: 1, description: "Rede Expandida" },
+]
+
+// Mock data para lista de influencers
+const mockInfluencers: NetworkMember[] = [
   {
-    id: "aff1",
-    nome_completo: "João Silva",
-    is_active: true,
-    commission_rate: 10.0,
-    direct_referrals: 15,
-    total_deposited: 1500.0,
-    commission_received: 150.0,
+    id: "1",
+    name: "João Silva",
+    type: "influencer",
+    level: 1,
+    joinedAt: new Date(2024, 0, 15).toISOString(),
+    totalEarnings: 75000,
+    children: [
+      {
+        id: "1-1",
+        name: "Maria Santos",
+        type: "client",
+        level: 2,
+        joinedAt: new Date(2024, 1, 1).toISOString(),
+        totalEarnings: 5000,
+      },
+      {
+        id: "1-2",
+        name: "Pedro Oliveira",
+        type: "client",
+        level: 2,
+        joinedAt: new Date(2024, 1, 5).toISOString(),
+        totalEarnings: 7500,
+      },
+    ],
   },
   {
-    id: "aff2",
-    nome_completo: "Maria Souza",
-    is_active: true,
-    commission_rate: 12.5,
-    direct_referrals: 22,
-    total_deposited: 2500.0,
-    commission_received: 312.5,
+    id: "2",
+    name: "Ana Costa",
+    type: "influencer",
+    level: 1,
+    joinedAt: new Date(2024, 0, 10).toISOString(),
+    totalEarnings: 120000,
+    children: [
+      {
+        id: "2-1",
+        name: "Carlos Souza",
+        type: "influencer",
+        level: 2,
+        joinedAt: new Date(2024, 1, 15).toISOString(),
+        totalEarnings: 25000,
+        children: [
+          {
+            id: "2-1-1",
+            name: "Mariana Lima",
+            type: "client",
+            level: 3,
+            joinedAt: new Date(2024, 2, 1).toISOString(),
+            totalEarnings: 3000,
+          },
+        ],
+      },
+    ],
   },
   {
-    id: "aff3",
-    nome_completo: "Carlos Pereira",
-    is_active: false,
-    commission_rate: 8.0,
-    direct_referrals: 5,
-    total_deposited: 300.0,
-    commission_received: 24.0,
-  },
-  {
-    id: "aff4",
-    nome_completo: "Ana Costa",
-    is_active: true,
-    commission_rate: 11.0,
-    direct_referrals: 18,
-    total_deposited: 1800.0,
-    commission_received: 198.0,
-  },
-  {
-    id: "aff5",
-    nome_completo: "Pedro Almeida",
-    is_active: true,
-    commission_rate: 9.5,
-    direct_referrals: 10,
-    total_deposited: 800.0,
-    commission_received: 76.0,
-  },
-  {
-    id: "aff6",
-    nome_completo: "Mariana Lima",
-    is_active: true,
-    commission_rate: 10.0,
-    direct_referrals: 15,
-    total_deposited: 1500.0,
-    commission_received: 150.0,
-  },
-  {
-    id: "aff7",
-    nome_completo: "Fernando Rocha",
-    is_active: true,
-    commission_rate: 12.5,
-    direct_referrals: 22,
-    total_deposited: 2500.0,
-    commission_received: 312.5,
-  },
-  {
-    id: "aff8",
-    nome_completo: "Isabela Santos",
-    is_active: false,
-    commission_rate: 8.0,
-    direct_referrals: 5,
-    total_deposited: 300.0,
-    commission_received: 24.0,
-  },
-  {
-    id: "aff9",
-    nome_completo: "Rafael Oliveira",
-    is_active: true,
-    commission_rate: 11.0,
-    direct_referrals: 18,
-    total_deposited: 1800.0,
-    commission_received: 198.0,
-  },
-  {
-    id: "aff10",
-    nome_completo: "Laura Martins",
-    is_active: true,
-    commission_rate: 9.5,
-    direct_referrals: 10,
-    total_deposited: 800.0,
-    commission_received: 76.0,
-  },
-  {
-    id: "aff11",
-    nome_completo: "Lucas Costa",
-    is_active: true,
-    commission_rate: 10.0,
-    direct_referrals: 15,
-    total_deposited: 1500.0,
-    commission_received: 150.0,
-  },
-  {
-    id: "aff12",
-    nome_completo: "Beatriz Almeida",
-    is_active: true,
-    commission_rate: 12.5,
-    direct_referrals: 22,
-    total_deposited: 2500.0,
-    commission_received: 312.5,
-  },
-  {
-    id: "aff13",
-    nome_completo: "Gabriel Lima",
-    is_active: false,
-    commission_rate: 8.0,
-    direct_referrals: 5,
-    total_deposited: 300.0,
-    commission_received: 24.0,
-  },
-  {
-    id: "aff14",
-    nome_completo: "Sofia Rocha",
-    is_active: true,
-    commission_rate: 11.0,
-    direct_referrals: 18,
-    total_deposited: 1800.0,
-    commission_received: 198.0,
-  },
-  {
-    id: "aff15",
-    nome_completo: "Daniel Santos",
-    is_active: true,
-    commission_rate: 9.5,
-    direct_referrals: 10,
-    total_deposited: 800.0,
-    commission_received: 76.0,
+    id: "3",
+    name: "Lucas Ferreira",
+    type: "influencer",
+    level: 1,
+    joinedAt: new Date(2024, 1, 1).toISOString(),
+    totalEarnings: 95000,
+    children: [
+      {
+        id: "3-1",
+        name: "Julia Martins",
+        type: "client",
+        level: 2,
+        joinedAt: new Date(2024, 2, 5).toISOString(),
+        totalEarnings: 8000,
+      },
+    ],
   },
 ]
-// --- END MOCK DATA ---
+
+// Mock data para recursos de marketing
+const mockMarketingResources: MarketingResource[] = [
+  {
+    id: "1",
+    title: "Kit de Mídia Social",
+    description: "Kit completo para mídias sociais",
+    type: "document",
+    category: "social",
+    url: "https://example.com/kit-social",
+  },
+  {
+    id: "2",
+    title: "Vídeo Institucional",
+    description: "Vídeo institucional da empresa",
+    type: "video",
+    category: "presentation",
+    url: "https://example.com/video",
+  },
+  {
+    id: "3",
+    title: "Templates WhatsApp",
+    description: "Templates para mensagens do WhatsApp",
+    type: "image",
+    category: "whatsapp",
+    url: "https://example.com/templates",
+  },
+  {
+    id: "4",
+    title: "Newsletter Template",
+    description: "Template para newsletters",
+    type: "document",
+    category: "email",
+    url: "https://example.com/newsletter",
+  },
+]
 
 export default function AdminAffiliatesPage() {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
-  const [editions, setEditions] = useState<Edition[]>(mockEditions) // Usando mockEditions
-  const [selectedEditionId, setSelectedEditionId] = useState<string>(mockEditions[0]?.id || "")
-  const [selectedEdition, setSelectedEdition] = useState<Edition | null>(mockEditions[0] || null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [affiliates, setAffiliates] = useState<AffiliateProcessed[]>(initialMockAffiliatesData) // Usando initialMockAffiliatesData
-  const [kpis, setKpis] = useState({
-    totalActiveAffiliates: 0,
-    totalReferrals: 0,
-    totalDeposited: 0,
-    totalCommissions: 0,
-  })
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const [affiliates, setAffiliates] = useState<AffiliateProcessed[]>([])
+  const [activeTab, setActiveTab] = useState<"overview" | "network" | "resources" | "management" | "promotions" | "settings">("overview")
 
-  // Novos estados para o modal de edição de comissão
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 25
+
+  // Estados para o modal de edição de comissão
   const [isEditCommissionModalOpen, setIsEditCommissionModalOpen] = useState(false)
-  const [editMode, setEditMode] = useState<"single" | "bulk" | "global">("single")
+  const [editMode, setEditMode] = useState<"single" | "bulk">("single")
   const [editingAffiliate, setEditingAffiliate] = useState<AffiliateProcessed | null>(null)
   const [selectedAffiliateIds, setSelectedAffiliateIds] = useState<string[]>([])
 
-  // Função para carregar dados dos afiliados (agora do mock)
-  const loadAffiliatesData = () => {
-    setIsLoading(true)
-    // Simulate API call delay
-    setTimeout(() => {
-      const filtered = initialMockAffiliatesData.filter((affiliate) =>
-        affiliate.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()),
+  // Estados para os novos componentes
+  const [networkStats, setNetworkStats] = useState<NetworkStats[]>(mockNetworkStats)
+  const [marketingResources, setMarketingResources] = useState<MarketingResource[]>(mockMarketingResources)
+  const [promotions, setPromotions] = useState<Promotion[]>([])
+
+  // Função para buscar promoções
+  const fetchPromotions = async () => {
+    try {
+      const response = await api.get('/api/promocoes')
+
+      const responseData = response.data
+      
+      // Mapear os dados da API para o formato esperado pelo componente
+      const processedPromotions = responseData.data.map((promo: Promocao) => ({
+        id: promo.id,
+        titulo: promo.titulo,
+        descricao: promo.descricao,
+        tipo_premiacao: promo.tipo_premiacao,
+        premio_descricao: promo.premio_descricao,
+        meta_vendas: promo.meta_vendas,
+        inicio_em: new Date(promo.inicio_em).toISOString().split('T')[0],
+        fim_em: new Date(promo.fim_em).toISOString().split('T')[0],
+        is_ativa: promo.is_ativa,
+        criado_em: promo.criado_em,
+        atualizado_em: promo.atualizado_em
+      } as Promotion))
+
+      setPromotions(processedPromotions)
+    } catch (error) {
+      console.error('Erro ao carregar promoções:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de promoções.",
+        duration: 3000,
+      })
+    }
+  }
+  const [commissionLevels, setCommissionLevels] = useState<CommissionLevel[]>(mockCommissionLevels)
+  
+  // Estado para os influencers da rede
+  const [networkInfluencers, setNetworkInfluencers] = useState<NetworkMember[]>([])
+
+  // Função para buscar dados da API
+  const fetchInfluencers = async () => {
+    try {
+      setIsLoading(true)
+      const response = await api.get('/api/influencers/listar')
+      const responseData: ApiResponse = response.data
+      const data = responseData.data
+      
+      // Processar os dados para o formato da tabela
+      const processedData: AffiliateProcessed[] = data.map(influencer => ({
+        id: influencer.id,
+        nome: influencer.nome,
+        is_active: influencer.status === 'ativo',
+        codigo: influencer.codigo_influencer,
+        commission_n1: influencer.comissoes.find(c => c.nivel === 'direto')?.percentual || 0,
+        commission_n2: influencer.comissoes.find(c => c.nivel === 'secundario')?.percentual || 0,
+        commission_n3: influencer.comissoes.find(c => c.nivel === 'expandido')?.percentual || 0
+      }))
+
+      // Filtrar se houver termo de busca
+      const filtered = processedData.filter((affiliate) =>
+        affiliate.nome.toLowerCase().includes(searchTerm.toLowerCase())
       )
 
-      // Calculate KPIs based on filtered data for the selected edition (mock logic)
-      const activeAffiliates = filtered.filter((aff) => aff.is_active).length
-      const totalReferrals = filtered.reduce((sum, aff) => sum + aff.direct_referrals, 0)
-      const totalDeposited = filtered.reduce((sum, aff) => sum + aff.total_deposited, 0)
-      const totalCommissions = filtered.reduce((sum, aff) => sum + aff.commission_received, 0)
-
       setAffiliates(filtered)
-      setKpis({
-        totalActiveAffiliates: activeAffiliates,
-        totalReferrals: totalReferrals,
-        totalDeposited: totalDeposited,
-        totalCommissions: totalCommissions,
+      
+      // Função recursiva para converter membros da rede
+      const convertRedeMembro = (membro: any, level: number): NetworkMember => {
+        // Verificar se o membro tem a estrutura necessária
+        if (!membro || !membro.rede) {
+          return {
+            id: membro?.id || 'unknown',
+            name: membro?.nome || 'Membro Desconhecido',
+            type: level === 1 ? "influencer" : "client",
+            level: level,
+            joinedAt: membro?.data_cadastro || new Date().toISOString(),
+            totalEarnings: membro?.volume_depositos || 0,
+            status: membro?.status || 'inativo',
+            children: []
+          }
+        }
+
+        // Verificar se a data de cadastro é válida
+        let joinedAt = membro.data_cadastro
+        if (!joinedAt || typeof joinedAt !== 'string') {
+          joinedAt = new Date().toISOString()
+        }
+
+        // Verificar se o volume de depósitos é válido
+        let totalEarnings = membro.volume_depositos
+        if (typeof totalEarnings !== 'number' || isNaN(totalEarnings)) {
+          totalEarnings = 0
+        }
+
+        return {
+          id: membro.id,
+          name: membro.nome,
+          type: level === 1 ? "influencer" : "client",
+          level: level,
+          joinedAt: joinedAt,
+          totalEarnings: totalEarnings,
+          status: membro.status,
+          children: [
+            ...(membro.rede.diretos || []).map((direto: any) => convertRedeMembro(direto, level + 1)),
+            ...(membro.rede.secundarios || []).map((secundario: any) => convertRedeMembro(secundario, level + 1)),
+            ...(membro.rede.expandidos || []).map((expandido: any) => convertRedeMembro(expandido, level + 1))
+          ].filter(child => child.name) // Remove membros vazios
+        }
+      }
+      
+      // Processar dados para a visualização da rede
+      try {
+        const networkData: NetworkMember[] = data.map(influencer => convertRedeMembro(influencer, 1))
+        setNetworkInfluencers(networkData)
+      } catch (error) {
+        console.error('Erro ao processar dados da rede:', error)
+        setNetworkInfluencers([])
+      }
+      setCurrentPage(1)
+      setSelectedAffiliateIds([])
+    } catch (error) {
+      console.error('Erro ao carregar influencers:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Não foi possível carregar a lista de influencers.'
+      toast({
+        title: "Erro",
+        description: errorMessage,
+        duration: 3000,
       })
-      setCurrentPage(1) // Reset pagination on data load
-      setSelectedAffiliateIds([]) // Clear selections
+    } finally {
       setIsLoading(false)
-    }, 500) // Simulate network delay
+    }
   }
 
-  // Carregar dados dos afiliados quando a edição selecionada ou o termo de busca mudar
+  // Carregar dados quando o componente montar ou quando houver busca
   useEffect(() => {
-    loadAffiliatesData()
-  }, [selectedEdition, searchTerm])
+    fetchInfluencers()
+  }, [searchTerm])
+
+  // Carregar promoções quando a página carregar
+  useEffect(() => {
+    fetchPromotions()
+  }, [])
 
   // Pagination logic
   const totalPages = Math.ceil(affiliates.length / itemsPerPage)
@@ -282,16 +409,25 @@ export default function AdminAffiliatesPage() {
   }
 
   const handleToggleStatus = (affiliateId: string, currentStatus: boolean) => {
-    setAffiliates((prevAffiliates) =>
-      prevAffiliates.map((aff) => (aff.id === affiliateId ? { ...aff, is_active: !currentStatus } : aff)),
+    // Atualizamos o estado local
+    setAffiliates(prevAffiliates => 
+      prevAffiliates.map(aff => {
+        if (aff.id === affiliateId) {
+          return { ...aff, is_active: !currentStatus }
+        }
+        return aff
+      })
     )
+
+    // Encontramos o afiliado para mostrar o nome correto no toast
+    const affiliate = affiliates.find((a) => a.id === affiliateId)
+    
+    // Mostramos o toast com a mensagem apropriada
     toast({
       title: "Status Atualizado",
-      description: `Status do afiliado ${affiliates.find((a) => a.id === affiliateId)?.nome_completo} foi alterado.`,
+      description: `${affiliate?.nome} foi ${!currentStatus ? 'bloqueado' : 'desbloqueado'}.`,
       duration: 3000,
     })
-    // Recalculate KPIs after status change
-    loadAffiliatesData()
   }
 
   // Mock session time for AdminSidebar
@@ -353,335 +489,371 @@ export default function AdminAffiliatesPage() {
   }
 
   const openBulkEditModal = () => {
-    if (selectedAffiliateIds.length === 0) {
-      toast({
-        title: "Nenhum Afiliado Selecionado",
-        description: "Por favor, selecione pelo menos um afiliado para alterar a comissão em massa.",
-        variant: "destructive",
-      })
-      return
-    }
     setEditMode("bulk")
-    setIsEditCommissionModalOpen(true)
-  }
-
-  const openGlobalEditModal = () => {
-    setEditMode("global")
+    setEditingAffiliate(null)
     setIsEditCommissionModalOpen(true)
   }
 
   const handleSaveCommission = async (newRate: number) => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    if (editMode === "single" && editingAffiliate) {
+      setAffiliates((prev) =>
+        prev.map((a) =>
+          a.id === editingAffiliate.id ? { ...a, commission_n1: newRate } : a
+        )
+      )
+      toast({
+        title: "Comissão Atualizada",
+        description: `A comissão de ${editingAffiliate.nome} foi atualizada para ${newRate}%.`,
+      })
+    } else if (editMode === "bulk") {
+      setAffiliates((prev) =>
+        prev.map((a) =>
+          selectedAffiliateIds.includes(a.id) ? { ...a, commission_n1: newRate } : a
+        )
+      )
+      toast({
+        title: "Comissões Atualizadas",
+        description: `A comissão foi atualizada para ${newRate}% em ${selectedAffiliateIds.length} afiliados.`,
+      })
+    }
 
-    setAffiliates((prevAffiliates) => {
-      if (editMode === "single" && editingAffiliate) {
-        return prevAffiliates.map((aff) =>
-          aff.id === editingAffiliate.id ? { ...aff, commission_rate: newRate } : aff,
-        )
-      } else if (editMode === "bulk") {
-        return prevAffiliates.map((aff) =>
-          selectedAffiliateIds.includes(aff.id) ? { ...aff, commission_rate: newRate } : aff,
-        )
-      } else if (editMode === "global") {
-        return prevAffiliates.map((aff) => ({ ...aff, commission_rate: newRate }))
-      }
-      return prevAffiliates
+    setIsEditCommissionModalOpen(false)
+    setEditingAffiliate(null)
+    setSelectedAffiliateIds([])
+  }
+
+  const handleAddResource = (resource: MarketingResource) => {
+    setMarketingResources((prev) => [...prev, resource])
+  }
+
+  const handleDeleteResource = (resourceId: string) => {
+    setMarketingResources((prev) => prev.filter((r) => r.id !== resourceId))
+  }
+
+  const handleSavePromotion = (promotion: Promotion) => {
+    setPromotions((prev) => [...prev, promotion])
+    toast({
+      title: "Promoção Salva",
+      description: "A promoção foi salva com sucesso.",
     })
-    // Recalculate KPIs after commission change
-    loadAffiliatesData()
+  }
+
+  const handleDeletePromotion = (promotionId: string) => {
+    setPromotions((prev) => prev.filter((p) => p.id !== promotionId))
+    toast({
+      title: "Promoção Removida",
+      description: "A promoção foi removida com sucesso.",
+    })
+  }
+
+  const handleSaveCommissionLevels = (levels: CommissionLevel[]) => {
+    setCommissionLevels(levels)
+    toast({
+      title: "Configurações Salvas",
+      description: "As configurações de comissão foram atualizadas com sucesso.",
+    })
   }
 
   return (
     <div className="flex min-h-screen bg-[#131B24]">
-      <AdminSidebar sessionTimeRemaining={sessionTimeRemaining} onLogout={handleLogout} />
+      <AdminSidebar onLogout={handleLogout} />
       <div className="flex flex-col flex-1 lg:ml-64">
-        <AdminHeaderMobile /> {/* Mobile header with menu trigger */}
+        <AdminHeaderMobile onLogout={handleLogout} />
         <main className="flex-1 p-4 md:p-6 lg:p-8">
           {/* Header da Página */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-            <h1 className="text-2xl font-bold text-white">Afiliados</h1>
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-              <Button
-                onClick={openGlobalEditModal}
-                className="bg-[#9FFF00] hover:bg-[#9FFF00]/90 text-[#191F26] w-full sm:w-auto"
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                Comissão Global
-              </Button>
-              <Select
-                value={selectedEditionId}
-                onValueChange={(value) => {
-                  setSelectedEditionId(value)
-                  setSelectedEdition(editions.find((e) => e.id === value) || null)
-                }}
-              >
-                <SelectTrigger className="w-full bg-[#232A34] border-[#366D51] text-white sm:w-80">
-                  <SelectValue placeholder="Selecione uma edição" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#232A34] border-[#366D51] text-white">
-                  {editions.map((edition) => (
-                    <SelectItem key={edition.id} value={edition.id}>
-                      {edition.name}
-                      {edition.current && (
-                        <span className="ml-2 inline-flex items-center rounded-md bg-[#9FFF00]/20 px-2 py-0.5 text-xs font-medium text-[#9FFF00]">
-                          Atual
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              <Gift className="h-7 w-7 text-[#9FFF00]" />
+              Gestão de Influencers
+            </h1>
           </div>
 
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <Card className="bg-[#232A34] border-[#366D51] shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2 flex flex-col items-center">
-                <CardTitle className="text-sm font-medium text-white text-center">Afiliados Ativos</CardTitle>
-                <Users className="h-4 w-4 text-[#9FFF00] mt-1" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white text-center">
-                  {isLoading ? "..." : kpis.totalActiveAffiliates}
-                </div>
-                <p className="text-xs text-gray-400 text-center">Afiliados com comissão ou indicação na edição</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#232A34] border-[#366D51] shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2 flex flex-col items-center">
-                <CardTitle className="text-sm font-medium text-white text-center">Total de Indicações</CardTitle>
-                <Users className="h-4 w-4 text-[#9FFF00] mt-1" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white text-center">
-                  {isLoading ? "..." : kpis.totalReferrals}
-                </div>
-                <p className="text-xs text-gray-400 text-center">Usuários indicados na edição</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#232A34] border-[#366D51] shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2 flex flex-col items-center">
-                <CardTitle className="text-sm font-medium text-white text-center">Total Depositado</CardTitle>
-                <DollarSign className="h-4 w-4 text-[#9FFF00] mt-1" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white text-center">
-                  {isLoading ? "..." : formatCurrency(kpis.totalDeposited)}
-                </div>
-                <p className="text-xs text-gray-400 text-center">Depósitos via indicados na edição</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#232A34] border-[#366D51] shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2 flex flex-col items-center">
-                <CardTitle className="text-sm font-medium text-white text-center">Comissões Pagas</CardTitle>
-                <Percent className="h-4 w-4 text-[#9FFF00] mt-1" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white text-center">
-                  {isLoading ? "..." : formatCurrency(kpis.totalCommissions)}
-                </div>
-                <p className="text-xs text-gray-400 text-center">Total em comissões na edição</p>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Filtros e Tabela de Afiliados */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-              <div className="relative w-full sm:w-auto flex-grow">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar afiliado por nome..."
-                  className="pl-9 bg-[#1A2430] border-[#366D51] text-white"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value)
-                  }}
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="bg-transparent text-[#9FFF00] border-[#9FFF00]/30 hover:bg-[#9FFF00]/10 hover:text-[#9FFF00] w-full sm:w-auto"
-                    disabled={selectedAffiliateIds.length === 0}
-                  >
-                    Ações em Massa ({selectedAffiliateIds.length})
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#232A34] border-[#366D51] text-white">
-                  <DropdownMenuItem onClick={openBulkEditModal} className="hover:bg-[#366D51]/30 cursor-pointer">
-                    Alterar Comissão
-                  </DropdownMenuItem>
-                  {/* Adicionar outras ações em massa aqui, se necessário */}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+          {/* Tabs */}
+          <div className="bg-[#1E2530] rounded-lg p-1">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)}>
+              <TabsList className="w-full bg-transparent">
+                <TabsTrigger
+                  value="overview"
+                  className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                >
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Visão Geral
+                </TabsTrigger>
+                <TabsTrigger
+                  value="network"
+                  className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                >
+                  <Gift className="h-4 w-4 mr-2" />
+                  Rede
+                </TabsTrigger>
+                <TabsTrigger
+                  value="resources"
+                  className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                >
+                  <Award className="h-4 w-4 mr-2" />
+                  Recursos
+                </TabsTrigger>
+                <TabsTrigger
+                  value="promotions"
+                  className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                >
+                  <Gift className="h-4 w-4 mr-2" />
+                  Promoções
+                </TabsTrigger>
+                <TabsTrigger
+                  value="settings"
+                  className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                >
+                  <Percent className="h-4 w-4 mr-2" />
+                  Comissões
+                </TabsTrigger>
+                <TabsTrigger
+                  value="management"
+                  className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Gestão
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="rounded-md border border-[#366D51] overflow-hidden">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-[#1A2430]">
-                    <TableRow>
-                      <TableHead className="w-12 text-center">
-                        <Checkbox
-                          checked={selectedAffiliateIds.length === affiliates.length && affiliates.length > 0}
-                          onCheckedChange={handleSelectAll}
-                          className="border-[#9FFF00] data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26]"
+              <div className="mt-6">
+                <TabsContent value="overview">
+                  <NetworkOverviewAdmin stats={networkStats} />
+                </TabsContent>
+
+                <TabsContent value="network">
+                  <div className="space-y-6">
+                    <InfluencersNetworkView influencers={networkInfluencers} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="resources">
+                  <MarketingResourcesAdmin
+                    resources={marketingResources}
+                    onAddResource={handleAddResource}
+                    onDeleteResource={handleDeleteResource}
+                  />
+                </TabsContent>
+
+                <TabsContent value="promotions">
+                  <PromotionsManager
+                    initialPromotions={promotions}
+                    onSave={handleSavePromotion}
+                    onDelete={handleDeletePromotion}
+                  />
+                </TabsContent>
+
+                <TabsContent value="settings">
+                  <div className="space-y-6">
+                    <CommissionManager
+                      influencers={affiliates.map(aff => ({
+                        id: aff.id,
+                        nome: aff.nome,
+                        codigo_influencer: aff.codigo,
+                        status: aff.is_active ? 'ativo' : 'bloqueado'
+                      }))}
+                      initialCommissions={commissionLevels}
+                      onSave={handleSaveCommissionLevels}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="management">
+                  {/* Tabela de Gestão de Afiliados */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+                      <div className="relative w-full sm:w-auto flex-grow">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          placeholder="Buscar afiliado por nome..."
+                          className="pl-9 bg-[#1A2430] border-[#366D51] text-white"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                      </TableHead>
-                      <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Afiliado
-                      </TableHead>
-                      <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Indicados na Edição
-                      </TableHead>
-                      <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Total Depositado na Edição
-                      </TableHead>
-                      <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        % Comissão
-                      </TableHead>
-                      <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Comissão Gerada na Edição
-                      </TableHead>
-                      <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Status
-                      </TableHead>
-                      <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Ações
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="bg-[#232A34] divide-y divide-[#366D51]">
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-gray-400 py-8">
-                          Carregando dados...
-                        </TableCell>
-                      </TableRow>
-                    ) : paginatedAffiliates.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-gray-400 py-8">
-                          Nenhum afiliado encontrado para esta edição.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedAffiliates.map((affiliate) => (
-                        <TableRow key={affiliate.id}>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={selectedAffiliateIds.includes(affiliate.id)}
-                              onCheckedChange={(checked) => handleSelectAffiliate(affiliate.id, !!checked)}
-                              className="border-[#9FFF00] data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26]"
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium text-white text-center">
-                            {affiliate.nome_completo}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-300 text-center">
-                            {affiliate.direct_referrals}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-300 text-center">
-                            {formatCurrency(affiliate.total_deposited || 0)}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-300 text-center">
-                            {affiliate.commission_rate}%
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-300 text-center">
-                            {formatCurrency(affiliate.commission_received || 0)}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-300 text-center">
-                            <Badge
-                              className={
-                                affiliate.is_active
-                                  ? "bg-[#9FFF00]/20 text-[#9FFF00] w-24 flex items-center justify-center"
-                                  : "bg-red-500/20 text-red-500 w-24 flex items-center justify-center"
-                              }
-                            >
-                              {affiliate.is_active ? "Ativo" : "Bloqueado"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-300 text-center">
-                            <div className="flex justify-center gap-2">
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="bg-transparent text-[#9FFF00] border-[#9FFF00]/30 hover:bg-[#9FFF00]/10 hover:text-[#9FFF00] w-full sm:w-auto"
+                            disabled={selectedAffiliateIds.length === 0}
+                          >
+                            Ações em Massa ({selectedAffiliateIds.length})
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="bg-[#232A34] border-[#366D51] text-white">
+                          <DropdownMenuItem onClick={openBulkEditModal} className="hover:bg-[#366D51]/30 cursor-pointer">
+                            Alterar Comissão
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    {/* Tabela de Afiliados */}
+                    <div className="rounded-md border border-[#366D51] overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader className="bg-[#1A2430]">
+                            <TableRow>
+                              <TableHead className="w-12 text-center">
+                                <Checkbox
+                                  checked={selectedAffiliateIds.length === affiliates.length && affiliates.length > 0}
+                                  onCheckedChange={handleSelectAll}
+                                  className="border-[#9FFF00] data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26]"
+                                />
+                              </TableHead>
+                              <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Afiliado
+                              </TableHead>
+                              <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Cógido do Influencer
+                              </TableHead>
+                              <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                % Comissão N1
+                              </TableHead>
+                              <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                % Comissão N2
+                              </TableHead>
+                              <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                % Comissão N3
+                              </TableHead>
+                              <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Status
+                              </TableHead>
+                              <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                                Ações
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody className="bg-[#232A34] divide-y divide-[#366D51]">
+                            {isLoading ? (
+                              <TableRow>
+                                <TableCell colSpan={8} className="text-center text-gray-400 py-8">
+                                  Carregando dados...
+                                </TableCell>
+                              </TableRow>
+                            ) : paginatedAffiliates.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={8} className="text-center text-gray-400 py-8">
+                                  Nenhum afiliado encontrado para esta edição.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              paginatedAffiliates.map((affiliate) => (
+                                <TableRow key={affiliate.id} className="hover:bg-[#1A2430]">
+                                  <TableCell className="text-center py-4">
+                                    <Checkbox
+                                      checked={selectedAffiliateIds.includes(affiliate.id)}
+                                      onCheckedChange={(checked) => handleSelectAffiliate(affiliate.id, !!checked)}
+                                      className="border-[#9FFF00] data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26]"
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-medium text-white text-center">
+                                    {affiliate.nome}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-300 text-center">
+                                    {affiliate.codigo}
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-300 text-center">
+                                    {affiliate.commission_n1}%
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-300 text-center">
+                                    {affiliate.commission_n2}%
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-300 text-center">
+                                    {affiliate.commission_n3}%
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-300 text-center">
+                                    <Badge
+                                      className={
+                                        !affiliate.is_active
+                                          ? "bg-red-500/20 text-red-500 w-24 flex items-center justify-center"
+                                          : "bg-[#9FFF00]/20 text-[#9FFF00] w-24 flex items-center justify-center"
+                                      }
+                                    >
+                                      {!affiliate.is_active ? "Bloqueado" : "Ativo"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-gray-300 text-center">
+                                    <div className="flex justify-center">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleToggleStatus(affiliate.id, affiliate.is_active)}
+                                        className={
+                                          !affiliate.is_active
+                                            ? "border-red-500/30 hover:border-red-500/50 hover:bg-red-500/10 bg-transparent text-red-500"
+                                            : "border-[#9FFF00]/30 hover:border-[#9FFF00]/50 hover:bg-[#9FFF00]/10 bg-transparent text-[#9FFF00]"
+                                        }
+                                      >
+                                        {!affiliate.is_active ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+
+                    {/* Paginação */}
+                    {totalPages > 1 && (
+                      <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="text-sm text-gray-400">
+                          Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, affiliates.length)} de {affiliates.length} influencers
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="relative px-4 py-2 h-10 border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-gradient-to-r from-[#131B24] to-[#1A2430] hover:border-[#9FFF00] hover:text-[#9FFF00] hover:shadow-[0_0_10px_rgba(159,255,0,0.3)] disabled:opacity-40 disabled:text-[#4A7700] disabled:border-[#4A7700]/30 disabled:bg-transparent disabled:shadow-none transition-all duration-300 ease-in-out group overflow-hidden"
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-2" />
+                            Anterior
+                          </Button>
+                          {getPageNumbers().map((pageNumber, index) =>
+                            typeof pageNumber === "number" ? (
                               <Button
-                                variant="outline"
+                                key={index}
+                                variant={currentPage === pageNumber ? "default" : "outline"}
                                 size="sm"
-                                onClick={() => openSingleEditModal(affiliate)}
-                                className="border-[#9FFF00]/30 hover:border-[#9FFF00]/50 hover:bg-[#9FFF00]/10 bg-transparent"
-                              >
-                                <Edit className="h-4 w-4 text-[#9FFF00]" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleToggleStatus(affiliate.id, affiliate.is_active)}
+                                onClick={() => handlePageChange(pageNumber)}
                                 className={
-                                  affiliate.is_active
-                                    ? "border-red-500/30 hover:border-red-500/50 hover:bg-red-500/10 bg-transparent text-red-500"
-                                    : "border-green-500/30 hover:border-green-500/50 hover:bg-green-500/10 bg-transparent text-green-500"
+                                  currentPage === pageNumber
+                                    ? "bg-gradient-to-r from-[#9FFF00] to-[#8AE000] text-black hover:from-[#8AE000] hover:to-[#7AC000] shadow-[0_0_15px_rgba(159,255,0,0.4)] border-none min-w-[40px] h-10"
+                                    : "border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-[#9FFF00]/10 hover:text-[#9FFF00] hover:border-[#9FFF00] focus:border-[#9FFF00] focus:text-[#9FFF00] focus:ring-1 focus:ring-[#9FFF00] active:border-[#9FFF00] active:text-[#9FFF00] active:bg-[#9FFF00]/20 min-w-[40px] h-10"
                                 }
                               >
-                                {affiliate.is_active ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                                {pageNumber}
                               </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                            ) : (
+                              <span key={index} className="text-gray-400 px-2">
+                                {pageNumber}
+                              </span>
+                            ),
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="relative px-4 py-2 h-10 border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-gradient-to-r from-[#1A2430] to-[#131B24] hover:border-[#9FFF00] hover:text-[#9FFF00] hover:shadow-[0_0_10px_rgba(159,255,0,0.3)] disabled:opacity-40 disabled:text-[#4A7700] disabled:border-[#4A7700]/30 disabled:bg-transparent disabled:shadow-none transition-all duration-300 ease-in-out group overflow-hidden"
+                          >
+                            Próxima
+                            <ChevronRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </div>
+                      </div>
                     )}
-                  </TableBody>
-                </Table>
+                  </div>
+                </TabsContent>
               </div>
-            </div>
-
-            {/* Paginação */}
-            {totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="relative px-4 py-2 h-10 border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-gradient-to-r from-[#131B24] to-[#1A2430] hover:border-[#9FFF00] hover:text-[#9FFF00] hover:shadow-[0_0_10px_rgba(159,255,0,0.3)] disabled:opacity-40 disabled:text-[#4A7700] disabled:border-[#4A7700]/30 disabled:bg-transparent disabled:shadow-none transition-all duration-300 ease-in-out group overflow-hidden"
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Anterior
-                </Button>
-                {getPageNumbers().map((pageNumber, index) =>
-                  typeof pageNumber === "number" ? (
-                    <Button
-                      key={index}
-                      variant={currentPage === pageNumber ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePageChange(pageNumber)}
-                      className={
-                        currentPage === pageNumber
-                          ? "bg-gradient-to-r from-[#9FFF00] to-[#8AE000] text-black hover:from-[#8AE000] hover:to-[#7AC000] shadow-[0_0_15px_rgba(159,255,0,0.4)] border-none min-w-[40px] h-10"
-                          : "border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-[#9FFF00]/10 hover:text-[#9FFF00] hover:border-[#9FFF00] focus:border-[#9FFF00] focus:text-[#9FFF00] focus:ring-1 focus:ring-[#9FFF00] active:border-[#9FFF00] active:text-[#9FFF00] active:bg-[#9FFF00]/20 min-w-[40px] h-10"
-                      }
-                    >
-                      {pageNumber}
-                    </Button>
-                  ) : (
-                    <span key={index} className="text-gray-400 px-2">
-                      {pageNumber}
-                    </span>
-                  ),
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="relative px-4 py-2 h-10 border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-gradient-to-r from-[#1A2430] to-[#131B24] hover:border-[#9FFF00] hover:text-[#9FFF00] hover:shadow-[0_0_10px_rgba(159,255,0,0.3)] disabled:opacity-40 disabled:text-[#4A7700] disabled:border-[#4A7700]/30 disabled:bg-transparent disabled:shadow-none transition-all duration-300 ease-in-out group overflow-hidden"
-                >
-                  Próxima
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            )}
+            </Tabs>
           </div>
         </main>
       </div>
@@ -691,9 +863,9 @@ export default function AdminAffiliatesPage() {
         isOpen={isEditCommissionModalOpen}
         onClose={() => setIsEditCommissionModalOpen(false)}
         mode={editMode}
-        affiliateName={editingAffiliate?.nome_completo}
+        affiliateName={editingAffiliate?.nome}
         selectedAffiliateCount={selectedAffiliateIds.length}
-        initialCommissionRate={editingAffiliate?.commission_rate}
+        initialCommissionRate={editingAffiliate?.commission_n1}
         onSave={handleSaveCommission}
       />
     </div>

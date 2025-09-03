@@ -7,9 +7,11 @@ import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { SlotPrizeRevealModal } from "@/components/slot-prize-reveal-modal"
 import { useAudioPlayer } from "@/contexts/audio-player-context"
-import { realizarSorteioInstantaneo } from "@/lib/sorteio-service"
+import { realizarSorteioInstantaneo, obterChancesInstantaneasNaoUtilizadas } from "@/lib/sorteio-service"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+import { InsufficientChancesModal } from "@/components/insufficient-chances-modal"
+import { useCarteiraPremios } from "@/hooks/use-carteira-premios"
 
 export default function SlotPage() {
   const spinSoundRef = useRef<HTMLAudioElement | null>(null)
@@ -25,13 +27,14 @@ export default function SlotPage() {
   const MAX_MULTIPLIER = 20 // Multiplicador máximo é 20x
   const BASE_WIN_AMOUNT = 10 // Valor base ganho por vitória
 
-  const [gameChips, setGameChips] = useState(100) // Fichas para jogar, inicializadas com 100
-  const [saldoSacavel, setSaldoSacavel] = useState(500) // Saldo para sacar, inicializado com 500
+  const [gameChips, setGameChips] = useState(0) // Fichas para jogar, inicializado com 0
+  const { saldo: saldoSacavel, isLoading: isLoadingSaldo, refetch: refetchSaldo } = useCarteiraPremios()
   const [isAutoplayActive, setIsAutoplayActive] = useState(false)
   const [spinCount, setSpinCount] = useState(0)
   const [showPrizeModal, setShowPrizeModal] = useState(false)
   const [highlightedCells, setHighlightedCells] = useState<number[][] | null>(null)
   const [announcement, setAnnouncement] = useState("")
+  const [isInsufficientChancesModalOpen, setIsInsufficientChancesModalOpen] = useState(false)
 
   const autoplayIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const pressTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -129,11 +132,8 @@ export default function SlotPage() {
   const handlePrizeRevealed = useCallback((amount: number) => {
     const finalAmount = amount
 
-    setSaldoSacavel((prevSaldo) => {
-      const novoSaldo = prevSaldo + finalAmount
-      console.log(`[SlotPage] Prêmio revelado: ${finalAmount}. Novo saldo sacável: ${novoSaldo}`)
-      return novoSaldo
-    })
+    console.log(`[SlotPage] Prêmio revelado: ${finalAmount}. Atualizando saldo...`)
+    refetchSaldo() // Atualiza o saldo após receber o prêmio
   }, [])
 
   const handleSpinEnd = useCallback(() => {
@@ -263,6 +263,26 @@ export default function SlotPage() {
   ]
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0)
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Efeito para buscar chances instantâneas
+  useEffect(() => {
+    const fetchChances = async () => {
+      try {
+        const chances = await obterChancesInstantaneasNaoUtilizadas();
+        setGameChips(chances);
+        
+        // Verificar se o usuário tem chances suficientes
+        if (chances <= 0) {
+          setIsInsufficientChancesModalOpen(true);
+        }
+      } catch (error) {
+        console.error("Failed to load chances:", error);
+        setIsInsufficientChancesModalOpen(true);
+      }
+    };
+    fetchChances();
+  }, []);
+
+  // Efeito para rotação de frases
   useEffect(() => {
     phraseIntervalRef.current = setInterval(() => {
       setCurrentPhraseIndex((prevIndex) => (prevIndex + 1) % phrases.length)
@@ -400,6 +420,12 @@ export default function SlotPage() {
         isOpen={showPrizeModal}
         onClose={handlePrizeModalClose}
         onPrizeRevealed={handlePrizeRevealed}
+      />
+
+      {/* Insufficient Chances Modal */}
+      <InsufficientChancesModal
+        open={isInsufficientChancesModalOpen}
+        onOpenChange={setIsInsufficientChancesModalOpen}
       />
     </div>
   )

@@ -229,7 +229,7 @@ export default function AdminHqPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#191F26] text-white">
+    <div className="flex min-h-screen text-white">
       <AdminSidebar sessionTimeRemaining={sessionTimeRemaining} onLogout={handleLogout} />
       <div className="flex flex-1 flex-col md:ml-64">
         {" "}

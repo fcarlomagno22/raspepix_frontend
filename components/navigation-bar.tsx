@@ -15,10 +15,10 @@ export default function NavigationBar() {
 
   // Define the navigation items as per your request
   const navItems = [
-    { href: "/indique", icon: UsersIcon, label: "Indique" },
+    { href: "/indique", icon: UsersIcon, label: "Influencers" },
     { href: "/carteira", icon: WalletIcon, label: "Carteira" },
     { href: "/home", icon: HomeIcon, label: "Início" },
-    { href: "/titulos", icon: Ticket, label: "Cupons" }, // Texto alterado aqui
+    { href: "/titulos", icon: Ticket, label: "Títulos" }, // Texto alterado aqui
     { href: "/hqs", icon: BookOpen, label: "HQs" },
   ]
 

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EyeIcon, EyeOffIcon } from "lucide-react" // Import icons
 import { useRouter } from "next/navigation"
+import { useReferral } from "@/contexts/ReferralContext"
 import {
   maskCPF,
   maskDate,
@@ -110,6 +111,7 @@ const variants = {
 
 export default function RegistrationForm() {
   const router = useRouter()
+  const { referralCode } = useReferral()
   const [isLoading, setIsLoading] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(initialFormData)
@@ -245,24 +247,20 @@ export default function RegistrationForm() {
       const data = {
         email: formData.email,
         password: formData.password,
-        fullname: formData.fullName,
+        full_name: formData.fullName,
         cpf: formData.cpf.replace(/\D/g, ''), // Remove máscara do CPF
         phone: formData.phone.replace(/\D/g, ''), // Remove máscara do telefone
         birth_date: formattedDate,
         gender: formData.gender,
-        social_name: formData.socialName || undefined
+        social_name: formData.socialName || undefined,
+        referral_code: referralCode || undefined,
+        accepted_terms: formData.termsAccepted
       };
 
-      const response = await api.post('/api/auth/register', data);
+      await api.post('/api/auth/register', data);
       
-      // Armazenar tokens
-      const oneHour = new Date(new Date().getTime() + 60 * 60 * 1000);
-      Cookies.set('access_token', response.data.access_token, { expires: oneHour });
-      Cookies.set('refresh_token', response.data.refresh_token, { expires: oneHour });
-      Cookies.set('user', JSON.stringify(response.data.user), { expires: oneHour });
-
-      // Redirecionar para home
-      router.replace('/home');
+      // Redirecionar para página de login com mensagem de sucesso
+      router.replace('/login?registered=true');
     } catch (error: any) {
       console.error('Erro no registro:', error);
       setError(error.response?.data?.message || 'Erro ao criar conta. Tente novamente.');
@@ -654,7 +652,7 @@ export default function RegistrationForm() {
             {currentStep === 2 && ( // Changed from currentStep === 3
               <Button 
                 type="submit" 
-                className="bg-primary text-white hover:bg-primary/90 shadow-glow-sm ml-auto"
+                className="bg-primary text-[#202937] hover:bg-primary/90 shadow-glow-sm ml-auto"
                 disabled={isLoading}
               >
                 {isLoading ? "Cadastrando..." : "Cadastrar"}

@@ -1,4 +1,4 @@
-import { DollarSign, Trophy, Clock, Users } from "lucide-react"
+import { DollarSign, Trophy, Clock, Users, Ticket } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 // Helper para formatar valores como moeda BRL
@@ -16,6 +16,7 @@ interface DashboardMetricsProps {
   totalPrizeValue: number
   prizesRemaining: number
   weeklyParticipants: number
+  soldTickets: number
 }
 
 export default function DashboardMetrics({
@@ -23,6 +24,7 @@ export default function DashboardMetrics({
   totalPrizeValue,
   prizesRemaining,
   weeklyParticipants,
+  soldTickets,
 }: DashboardMetricsProps) {
   return (
     <section className="space-y-4">
@@ -30,7 +32,19 @@ export default function DashboardMetrics({
         <DollarSign className="h-6 w-6 text-[#9FFF00]" />
         Métricas Financeiras
       </h2>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {/* Títulos Vendidos */}
+        <Card className="bg-[#1A2430] border-[#9FFF00]/20 p-6 rounded-lg shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">Títulos Vendidos</CardTitle>
+            <Ticket className="h-5 w-5 text-blue-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{soldTickets.toLocaleString("pt-BR")}</div>
+            <p className="text-xs text-gray-500 mt-1">no período</p>
+          </CardContent>
+        </Card>
+
         {/* Receita Total */}
         <Card className="bg-[#1A2430] border-[#9FFF00]/20 p-6 rounded-lg shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -63,7 +77,7 @@ export default function DashboardMetrics({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{formatCurrency(prizesRemaining)}</div>
-            <p className="text-xs text-gray-500 mt-1">aguardando liberação</p>
+            <p className="text-xs text-gray-500 mt-1">sorteios instantâneos</p>
           </CardContent>
         </Card>
 

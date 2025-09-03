@@ -83,7 +83,7 @@ export default function HeroSection() {
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 1, duration: 1, type: "spring", stiffness: 100 }}
-        className="relative z-10 w-full max-w-xs md:max-w-sm lg:max-w-md mt-8 md:mt-0 animate-float"
+        className="relative z-10 w-full max-w-[13rem] md:max-w-[15.5rem] lg:max-w-[18rem] mt-8 md:mt-0 animate-float"
       >
         <video
           ref={videoRef}
@@ -94,7 +94,7 @@ export default function HeroSection() {
           preload="auto"
         >
           <source
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/video_hero-loDF5STYu07qEnZjI22Z5GpuU79ZV6.mp4"
+            src="https://kvwnpmdhyhrmfpgnojbh.supabase.co/storage/v1/object/public/raspepix/videos/banheiro_raspepix.mp4"
             type="video/mp4"
           />
           Seu navegador não suporta o elemento de vídeo.

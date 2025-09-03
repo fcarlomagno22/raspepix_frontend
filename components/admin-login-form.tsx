@@ -10,8 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
-import { api } from '@/services/api';
-import Cookies from 'js-cookie';
+import { adminAuth } from '@/services/auth';
 
 export default function AdminLoginForm() {
   const [isLoading, setIsLoading] = useState(false)
@@ -29,13 +28,12 @@ export default function AdminLoginForm() {
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
 
-      const response = await api.post('/api/admin/login', { email, password });
+      console.log('1. Iniciando login...');
       
-      // Armazenar token
-      Cookies.set('admin_token', response.data.token);
+      const response = await adminAuth.login({ email, password });
       
-      // Redirecionar para dashboard
-      router.replace('/admin/dashboard');
+      console.log('2. Login bem sucedido, redirecionando...');
+      window.location.href = '/admin/dashboard';
     } catch (error: any) {
       console.error('Erro no login:', error);
       setError(error.response?.data?.message || 'Erro ao fazer login. Tente novamente.');

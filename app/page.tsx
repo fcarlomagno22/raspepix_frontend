@@ -8,6 +8,7 @@ import PrizesSection from "@/components/prizes-section"
 import DomRipoComicsSection from "@/components/dom-ripo-comics-section"
 import CtaSection from "@/components/cta-section"
 import FooterSection from "@/components/footer-section" // Importa o novo rodapé
+import DomRipoStorySection from "@/components/dom-ripo-story-section"
 
 export default function WelcomePage() {
   return (
@@ -16,6 +17,7 @@ export default function WelcomePage() {
       <main className="flex-1">
         <HeroSection />
         <WeeklyLotterySection />
+        <DomRipoStorySection />
         <StatisticsSection />
         <HowItWorksSection />
         <LegalitySection />

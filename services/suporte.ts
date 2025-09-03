@@ -8,6 +8,7 @@ export interface Ticket {
   atualizado_em: string;
   ultima_mensagem: string;
   total_mensagens: number;
+  mensagens_nao_lidas: number;
 }
 
 export interface TicketMessage {

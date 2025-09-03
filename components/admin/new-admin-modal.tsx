@@ -12,11 +12,12 @@ import { useState } from "react"
 import type { AdminUser, PagePermission, Role } from "@/types/admin"
 import { formatCPF } from "@/lib/utils"
 import { availablePages } from "@/lib/admin-data"
+import { administradoresService } from "@/services/administradores"
 
 interface NewAdminModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (newAdmin: Omit<AdminUser, "id" | "isActive">) => Promise<void>
+  onSave: () => Promise<void>
   isSaving: boolean
 }
 
@@ -48,9 +49,26 @@ export function NewAdminModal({ isOpen, onClose, onSave, isSaving }: NewAdminMod
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSave({ name, cpf, email, role, permissions }) // Password would be handled securely on backend
-    resetForm()
-    onClose()
+    
+    try {
+      const adminData = {
+        nome_completo: name,
+        cpf: cpf.replace(/\D/g, ''), // Remove formatação do CPF
+        email,
+        senha: password,
+        funcao: role,
+        permissoes_pagina: permissions
+      }
+      
+      await administradoresService.cadastrar(adminData)
+      await onSave()
+      resetForm()
+      onClose()
+    } catch (error) {
+      console.error('Erro ao cadastrar administrador:', error)
+      // O erro será tratado pelo componente pai
+      throw error
+    }
   }
 
   return (
@@ -129,23 +147,51 @@ export function NewAdminModal({ isOpen, onClose, onSave, isSaving }: NewAdminMod
           </div>
           <div className="space-y-2">
             <Label className="text-white">Permissões de Acesso</Label>
-            <div className="bg-[#232D3F] border border-[#9FFF00]/10 rounded-md p-4 grid grid-cols-2 gap-3 overflow-y-auto">
-              {availablePages.map((page) => (
-                <div key={page.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`perm-${page.value}`}
-                    checked={permissions.includes(page.value)}
-                    onCheckedChange={(checked) => handlePermissionChange(page.value, checked as boolean)}
-                    className="border-[#9FFF00] data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26]"
-                  />
-                  <label
-                    htmlFor={`perm-${page.value}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-300"
-                  >
-                    {page.label}
-                  </label>
-                </div>
-              ))}
+            <div className="bg-[#232D3F] border border-[#9FFF00]/10 rounded-md p-4 space-y-4">
+              {/* Opção de acesso total */}
+              <div className="flex items-center space-x-2 border-b border-[#9FFF00]/20 pb-3">
+                <Checkbox
+                  id="perm-all"
+                  checked={permissions.includes("*")}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setPermissions(["*"])
+                    } else {
+                      setPermissions([])
+                    }
+                  }}
+                  className="border-[#9FFF00] data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26]"
+                />
+                <label
+                  htmlFor="perm-all"
+                  className="text-sm font-bold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-[#9FFF00]"
+                >
+                  Acesso Total (Todas as páginas)
+                </label>
+              </div>
+              
+              {/* Permissões individuais */}
+              <div className="grid grid-cols-2 gap-3 overflow-y-auto">
+                {availablePages.map((page) => (
+                  <div key={page.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`perm-${page.value}`}
+                      checked={permissions.includes(page.value)}
+                      disabled={permissions.includes("*")}
+                      onCheckedChange={(checked) => handlePermissionChange(page.value, checked as boolean)}
+                      className="border-[#9FFF00] data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26] disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor={`perm-${page.value}`}
+                      className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
+                        permissions.includes("*") ? "text-gray-500" : "text-gray-300"
+                      }`}
+                    >
+                      {page.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

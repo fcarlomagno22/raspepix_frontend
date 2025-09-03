@@ -114,11 +114,12 @@ export default function ConfiguracoesPage() {
   }
 
   // Handlers for Admin Users
-  const handleNewAdmin = async (newAdminData: Omit<AdminUser, "id" | "isActive">) => {
+  const handleNewAdmin = async () => {
     setIsSavingAdmin(true)
     try {
-      const createdAdmin = await createAdminUser(newAdminData)
-      setAdminUsers((prev) => [...prev, createdAdmin])
+      // Recarregar a lista de administradores após o cadastro
+      const admins = await getAdminUsers()
+      setAdminUsers(admins)
       setSuccessMessage("Novo administrador cadastrado com sucesso!")
       setIsSuccessModalOpen(true)
     } catch (error) {
@@ -215,7 +216,7 @@ export default function ConfiguracoesPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#191F26]">
+    <div className="flex min-h-screen">
       <AdminSidebar />
       <div className="flex flex-col flex-1 ml-0 lg:ml-64">
         <AdminHeaderMobile />

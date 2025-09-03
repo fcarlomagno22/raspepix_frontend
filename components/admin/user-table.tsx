@@ -1,32 +1,29 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { usuariosService, Usuario as ApiUser } from "@/services/usuarios"
+import { clientesService } from "@/services/clientes"
+import { toast } from "@/components/ui/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, Star, Eye, Check, X, ChevronLeft, ChevronRight, ArrowUpDown, Loader2 } from "lucide-react"
-import { formatCPF, formatCurrency, formatDate } from "@/lib/utils"
-import { UserDetailDrawer } from "./user-detail-drawer" // Importar o novo drawer
+import { Search, Eye, Lock, Unlock, ChevronLeft, ChevronRight, ArrowUpDown, Loader2 } from "lucide-react"
+import { formatCPF, formatCurrency, formatDate, formatPhoneNumber, capitalizeFirstLetter, formatDateBR } from "@/lib/utils"
+import { UserTransactionModal } from "./user-transaction-modal"
 
-interface User {
-  id: string
-  nome_completo: string
-  email: string
-  cpf: string
-  created_at: string // ISO string
-  total_deposited: number
-  total_lucky_numbers: number
-  total_prizes_received: number
-  saldo_sacavel: number
-  last_active_edition: string
-  is_active: boolean
-  is_influencer: boolean
+export interface User extends ApiUser {
+  is_influencer: boolean;
+  created_at?: string;
+  total_deposited?: number;
+  total_prizes_received?: number;
+  total_lucky_numbers?: number;
+  saldo_sacavel?: number;
 }
 
 interface UserTableProps {
-  users: User[]
+  initialUsers?: User[];
 }
 
 interface LuckyNumberPurchase {
@@ -49,14 +46,48 @@ interface Prize {
 
 const ITEMS_PER_PAGE = 10
 
-export default function UserTable({ users: initialUsers }: UserTableProps) {
+export default function UserTable({ initialUsers = [] }: UserTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativos" | "bloqueados">("todos")
   const [currentPage, setCurrentPage] = useState(1)
   const [sortColumn, setSortColumn] = useState<keyof User | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [isLoading, setIsLoading] = useState(false)
-  const [users, setUsers] = useState<User[]>(initialUsers) // Estado interno para permitir modificações
+  const [users, setUsers] = useState<User[]>(initialUsers)
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setIsLoading(true)
+      try {
+        const response = await usuariosService.listar()
+        
+        // Validar e mapear os usuários
+        const mappedUsers = response.data.map(user => {
+          if (!user.id) {
+            console.error('Usuário sem ID:', user)
+          }
+          return {
+            ...user,
+            is_influencer: false // Valor padrão
+          }
+        })
+
+        console.log('Usuários carregados:', mappedUsers)
+        setUsers(mappedUsers)
+      } catch (error) {
+        console.error('Erro ao carregar usuários:', error)
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar a lista de usuários.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUsers()
+  }, [])
 
   // Novos estados para o drawer de detalhes do usuário
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -68,7 +99,7 @@ export default function UserTable({ users: initialUsers }: UserTableProps) {
   const filteredAndSortedUsers = useMemo(() => {
     let filtered = users.filter((user) => {
       const matchesSearch =
-        user.nome_completo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.cpf.includes(searchTerm)
 
@@ -129,25 +160,58 @@ export default function UserTable({ users: initialUsers }: UserTableProps) {
     }
   }
 
-  const handleToggleActive = (userId: string) => {
-    setIsLoading(true)
-    setTimeout(() => {
-      setUsers((prevUsers) =>
-        prevUsers.map((user) => (user.id === userId ? { ...user, is_active: !user.is_active } : user)),
+  const handleToggleActive = async (userId: string) => {
+    try {
+      if (!userId) {
+        console.error("ID do usuário não fornecido")
+        return
+      }
+
+      setIsLoading(true)
+      const user = users.find(u => u.id === userId)
+      
+      if (!user) {
+        console.error("Usuário não encontrado na lista local:", userId)
+        return
+      }
+
+      const newStatus = !user.is_active
+      
+      console.log("Atualizando status do usuário:", {
+        userId,
+        user,
+        currentStatus: user.is_active,
+        newStatus
+      })
+
+      await clientesService.atualizarStatus(userId, newStatus)
+      
+      setUsers(prevUsers =>
+        prevUsers.map(u => u.id === userId ? { ...u, is_active: newStatus } : u)
       )
+
+      toast({
+        title: newStatus ? "Usuário desbloqueado" : "Usuário bloqueado",
+        description: `O usuário ${user.full_name} foi ${newStatus ? "desbloqueado" : "bloqueado"} com sucesso.`,
+        variant: "default",
+      })
+    } catch (error: any) {
+      console.error("Erro ao atualizar status do usuário:", {
+        userId,
+        error: error?.response?.data || error,
+        message: error?.message
+      })
+      
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status do usuário. Tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
       setIsLoading(false)
-    }, 500)
+    }
   }
 
-  const handleToggleInfluencer = (userId: string) => {
-    setIsLoading(true)
-    setTimeout(() => {
-      setUsers((prevUsers) =>
-        prevUsers.map((user) => (user.id === userId ? { ...user, is_influencer: !user.is_influencer } : user)),
-      )
-      setIsLoading(false)
-    }, 500)
-  }
 
   // Função para abrir o drawer de detalhes do usuário
   const openUserDrawer = (user: User) => {
@@ -241,52 +305,31 @@ export default function UserTable({ users: initialUsers }: UserTableProps) {
             <TableHeader className="bg-[#1A2430]">
               <TableRow className="border-[#366D51]">
                 <TableHead
-                  className="text-white cursor-pointer text-center flex items-center justify-center"
-                  onClick={() => handleSort("nome_completo")}
+                  className="text-white cursor-pointer text-center"
+                  onClick={() => handleSort("created_at")}
                 >
-                  Nome Completo {renderSortIcon("nome_completo")}
-                </TableHead>
-                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("email")}>
-                  E-mail {renderSortIcon("email")}
-                </TableHead>
-                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("cpf")}>
-                  CPF {renderSortIcon("cpf")}
-                </TableHead>
-                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("created_at")}>
                   Data de Cadastro {renderSortIcon("created_at")}
                 </TableHead>
                 <TableHead
                   className="text-white cursor-pointer text-center"
-                  onClick={() => handleSort("total_deposited")}
+                  onClick={() => handleSort("nome_completo")}
                 >
-                  Total Depositado {renderSortIcon("total_deposited")}
+                  Nome {renderSortIcon("nome_completo")}
                 </TableHead>
-                <TableHead
-                  className="text-white cursor-pointer text-center"
-                  onClick={() => handleSort("total_lucky_numbers")}
-                >
-                  Números da Sorte {renderSortIcon("total_lucky_numbers")}
+                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("email")}>
+                  E-mail {renderSortIcon("email")}
                 </TableHead>
-                <TableHead
-                  className="text-white cursor-pointer text-center"
-                  onClick={() => handleSort("total_prizes_received")}
-                >
-                  Prêmios Recebidos {renderSortIcon("total_prizes_received")}
+                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("idade")}>
+                  Idade {renderSortIcon("idade")}
                 </TableHead>
-                <TableHead
-                  className="text-white cursor-pointer text-center"
-                  onClick={() => handleSort("saldo_sacavel")}
-                >
-                  Saldo Sacável {renderSortIcon("saldo_sacavel")}
+                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("cpf")}>
+                  CPF {renderSortIcon("cpf")}
                 </TableHead>
-                <TableHead
-                  className="text-white cursor-pointer text-center"
-                  onClick={() => handleSort("last_active_edition")}
-                >
-                  Última Edição Ativa {renderSortIcon("last_active_edition")}
+                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("telefone")}>
+                  Telefone {renderSortIcon("telefone")}
                 </TableHead>
-                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("is_active")}>
-                  Status {renderSortIcon("is_active")}
+                <TableHead className="text-white cursor-pointer text-center" onClick={() => handleSort("genero")}>
+                  Gênero {renderSortIcon("genero")}
                 </TableHead>
                 <TableHead className="text-white text-center">Ações</TableHead>
               </TableRow>
@@ -294,79 +337,54 @@ export default function UserTable({ users: initialUsers }: UserTableProps) {
             <TableBody className="bg-[#232D3F] divide-y divide-[#366D51]">
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="h-40 text-center">
+                  <TableCell colSpan={6} className="h-40 text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-[#9FFF00] mx-auto" />
                     <p className="text-gray-400 mt-2">Carregando usuários...</p>
                   </TableCell>
                 </TableRow>
               ) : paginatedUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="h-40 text-center text-gray-400">
+                  <TableCell colSpan={6} className="h-40 text-center text-gray-400">
                     Nenhum usuário encontrado.
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedUsers.map((user) => (
                   <TableRow key={user.id} className="hover:bg-[#2A3547] transition-colors">
-                    <TableCell className="font-medium text-white flex items-center justify-center text-xs">
-                      {user.nome_completo}
-                      {user.is_influencer && <Star className="ml-2 h-3 w-3 text-yellow-400" title="Influencer" />}
+                    <TableCell className="text-gray-300 text-xs text-center">
+                      {formatDateBR(user.created_at)}
+                    </TableCell>
+                    <TableCell className="font-medium text-white text-center text-xs py-4">
+                      {user.full_name}
                     </TableCell>
                     <TableCell className="text-gray-300 text-xs text-center">{user.email}</TableCell>
+                    <TableCell className="text-gray-300 text-xs text-center">{user.idade}</TableCell>
                     <TableCell className="text-gray-300 text-xs text-center">{formatCPF(user.cpf)}</TableCell>
-                    <TableCell className="text-gray-300 text-xs text-center">{formatDate(user.created_at)}</TableCell>
-                    <TableCell className="text-gray-300 text-xs text-center">
-                      {formatCurrency(user.total_deposited)}
-                    </TableCell>
-                    <TableCell className="text-gray-300 text-xs text-center">
-                      {user.total_lucky_numbers.toLocaleString("pt-BR")}
-                    </TableCell>
-                    <TableCell className="text-gray-300 text-xs text-center">
-                      {formatCurrency(user.total_prizes_received)}
-                    </TableCell>
-                    <TableCell className="text-gray-300 text-xs text-center">
-                      {formatCurrency(user.saldo_sacavel)}
-                    </TableCell>
-                    <TableCell className="text-gray-300 text-xs text-center">{user.last_active_edition}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge
-                        className={`px-2 py-1 rounded-full text-xs font-medium w-20 text-center flex items-center justify-center ${
-                          user.is_active ? "bg-[#9FFF00]/20 text-[#9FFF00]" : "bg-red-500/20 text-red-400"
-                        }`}
-                      >
-                        {user.is_active ? "Ativo" : "Bloqueado"}
-                      </Badge>
-                    </TableCell>
+                    <TableCell className="text-gray-300 text-xs text-center">{formatPhoneNumber(user.phone)}</TableCell>
+                    <TableCell className="text-gray-300 text-xs text-center">{capitalizeFirstLetter(user.gender)}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex gap-2 justify-center">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-gray-400 hover:bg-[#9FFF00]/10 hover:text-[#9FFF00]"
+                          className={`
+                            ${user.is_active 
+                              ? "text-green-500 hover:bg-red-500/10 hover:text-red-500" 
+                              : "text-red-500 hover:bg-green-500/10 hover:text-green-500"
+                            }
+                          `}
                           onClick={() => handleToggleActive(user.id)}
-                          title={user.is_active ? "Bloquear Usuário" : "Ativar Usuário"}
+                          title={user.is_active ? "Bloquear Usuário" : "Desbloquear Usuário"}
                         >
-                          {user.is_active ? <X className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-                          <span className="sr-only">{user.is_active ? "Bloquear" : "Ativar"}</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-gray-400 hover:bg-yellow-400/10 hover:text-yellow-400"
-                          onClick={() => handleToggleInfluencer(user.id)}
-                          title={user.is_influencer ? "Remover Influencer" : "Tornar Influencer"}
-                        >
-                          <Star className="h-3 w-3" />
-                          <span className="sr-only">
-                            {user.is_influencer ? "Remover Influencer" : "Tornar Influencer"}
-                          </span>
+                          {user.is_active ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                          <span className="sr-only">{user.is_active ? "Bloquear" : "Desbloquear"}</span>
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="text-gray-400 hover:bg-blue-400/10 hover:text-blue-400"
                           title="Ver Detalhes"
-                          onClick={() => openUserDrawer(user)} // Adicione esta linha
+                          onClick={() => openUserDrawer(user)}
                         >
                           <Eye className="h-3 w-3" />
                           <span className="sr-only">Ver Detalhes</span>
@@ -428,13 +446,11 @@ export default function UserTable({ users: initialUsers }: UserTableProps) {
         </div>
       )}
 
-      {/* Drawer de Detalhes do Usuário */}
-      <UserDetailDrawer
+      {/* Modal de Transações do Usuário */}
+      <UserTransactionModal
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         user={drawerUser}
-        luckyNumbers={userLuckyNumbers}
-        prizes={userPrizes}
       />
     </div>
   )

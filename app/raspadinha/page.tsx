@@ -8,10 +8,11 @@ import { ExitConfirmationDialog } from "@/components/exit-confirmation-dialog"
 import { PrizeRevealModal } from "@/components/prize-reveal-modal"
 import { ScratchCard } from "@/components/scratch-card"
 import { fetchRaspadinhaData, fetchUserProfile, type Raspadinha } from "@/lib/raspadinha-data"
-import { realizarSorteioInstantaneo } from "@/lib/sorteio-service"
-import type { UserProfile } from "@/types/admin"
+import { realizarSorteioInstantaneo, obterChancesInstantaneasNaoUtilizadas } from "@/lib/sorteio-service"
+import type { UserProfile } from "@/types/user"
 import { motion } from "framer-motion"
 import { useAudioPlayer } from "@/contexts/audio-player-context" // Import useAudioPlayer
+import { InsufficientChancesModal } from "@/components/insufficient-chances-modal"
 
 export default function RaspadinhaPage() {
   const router = useRouter()
@@ -30,6 +31,7 @@ export default function RaspadinhaPage() {
   const [isCardFullyRevealed, setIsCardFullyRevealed] = useState(false)
   const [luckyNumber, setLuckyNumber] = useState<string | null>(null)
   const [playCount, setPlayCount] = useState(0) // New state to track plays
+  const [isInsufficientChancesModalOpen, setIsInsufficientChancesModalOpen] = useState(false)
 
   const imageRef = useRef<HTMLImageElement>(null)
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 })
@@ -65,12 +67,22 @@ export default function RaspadinhaPage() {
     async function loadData() {
       setIsLoading(true)
       try {
-        const [cardData, profileData] = await Promise.all([fetchRaspadinhaData(), fetchUserProfile()])
+        const [cardData, profileData, chances] = await Promise.all([
+          fetchRaspadinhaData(),
+          fetchUserProfile(),
+          obterChancesInstantaneasNaoUtilizadas()
+        ])
+        
         setRaspadinha(cardData)
         setUserProfile(profileData)
+
+        // Verificar se o usuário tem chances suficientes usando o valor real do banco
+        if (chances <= 0) {
+          setIsInsufficientChancesModalOpen(true)
+        }
       } catch (error) {
         console.error("Failed to load raspadinha or user data:", error)
-        // Handle error, e.g., redirect or show error message
+        // Não abrimos o modal em caso de erro, apenas se confirmamos que não há chances
       } finally {
         setIsLoading(false)
       }
@@ -307,6 +319,12 @@ export default function RaspadinhaPage() {
 
       {/* Exit Confirmation Dialog */}
       <ExitConfirmationDialog isOpen={isExitConfirmOpen} onConfirm={confirmExit} onCancel={cancelExit} />
+
+      {/* Insufficient Chances Modal */}
+      <InsufficientChancesModal
+        open={isInsufficientChancesModalOpen}
+        onOpenChange={setIsInsufficientChancesModalOpen}
+      />
     </div>
   )
 }

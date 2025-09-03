@@ -40,6 +40,7 @@ export default function Header() {
             alt="RaspePix Logo"
             width={150}
             height={45}
+            style={{ height: "auto" }}
             className="animate-pulse-glow-golden"
             priority
           />
@@ -119,7 +120,7 @@ export default function Header() {
             <DropdownMenuItem asChild>
               <Link href="/indique" className="flex items-center gap-2 cursor-pointer hover:bg-[#1a323a] rounded-sm">
                 <Gift className="h-4 w-4 text-[#9ffe00]" />
-                Indique e Ganhe
+                Influencers
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>

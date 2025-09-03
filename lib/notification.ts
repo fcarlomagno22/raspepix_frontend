@@ -6,9 +6,14 @@ interface ApiNotification {
   id: string
   title: string
   message: string
-  target_type: "all" | "selected" | "single"
-  is_active: boolean | undefined
-  criado_em: string
+  target_type?: "all" | "selected" | "single"
+  is_active?: boolean
+  created_at: string
+  date: string
+  time: string
+  status: string
+  single_user_id?: string
+  target_users?: string[]
 }
 
 interface ApiNotificationsResponse {
@@ -17,22 +22,35 @@ interface ApiNotificationsResponse {
 
 // Função para converter o formato da API para o formato do frontend
 const convertApiNotification = (apiNotif: ApiNotification): Notification => {
-  return {
+  console.log('Valores importantes:', {
+    is_active_type: typeof apiNotif.is_active,
+    is_active_value: apiNotif.is_active,
+    status: apiNotif.status
+  });
+  
+  const notification = {
     id: apiNotif.id,
     title: apiNotif.title,
     message: apiNotif.message,
     target_type: apiNotif.target_type || "all",
-    is_active: true, // Por padrão, todas as notificações são ativas
-    created_at: apiNotif.criado_em || new Date().toISOString(), // Usa a data de criação do Supabase
-  }
+    single_user_id: apiNotif.single_user_id,
+    target_users: apiNotif.target_users,
+    is_active: apiNotif.is_active,
+    created_at: apiNotif.created_at,
+    date: apiNotif.date || new Date().toLocaleDateString('pt-BR'),
+    time: apiNotif.time ? apiNotif.time.split('.')[0] : new Date().toLocaleTimeString('pt-BR'),
+    status: apiNotif.status
+  };
+  
+  return notification;
 }
 
 export const getAllNotifications = async (): Promise<Notification[]> => {
   try {
-    const response = await api.get('/api/notificacao/admin');
+    const response = await api.get('/api/admin/notificacao/list');
     const data = response.data;
     
-    console.log('Dados brutos da API:', data);
+    console.log('Dados brutos da API:', JSON.stringify(data, null, 2));
     
     if (!data || !Array.isArray(data.notifications)) {
       console.error('Formato de resposta inválido:', data);
@@ -40,9 +58,9 @@ export const getAllNotifications = async (): Promise<Notification[]> => {
     }
     
     const convertedNotifications = data.notifications.map(apiNotif => {
-      console.log('Notificação da API:', apiNotif);
+      console.log('Notificação da API (raw):', JSON.stringify(apiNotif, null, 2));
       const converted = convertApiNotification(apiNotif);
-      console.log('Notificação convertida:', converted);
+      console.log('Notificação convertida (final):', JSON.stringify(converted, null, 2));
       return converted;
     });
 
@@ -67,39 +85,95 @@ export const getAllNotifications = async (): Promise<Notification[]> => {
   }
 }
 
-// Função mock temporária para criar notificação
+export const updateNotificationStatus = async (id: string, isActive: boolean): Promise<Notification> => {
+  try {
+    console.log('Enviando atualização de status:', { id, isActive });
+    
+    const response = await api.patch(`/api/admin/notificacao/${id}/status`, {
+      is_active: isActive
+    });
+    
+    console.log('Resposta completa da API:', response.data);
+    
+    const notificationData = response.data.notification || response.data;
+    console.log('Dados da notificação retornados:', notificationData);
+    
+    const notification: Notification = {
+      id: notificationData.id,
+      title: notificationData.title,
+      message: notificationData.message,
+      target_type: notificationData.target_type || "all",
+      single_user_id: notificationData.single_user_id,
+      target_users: notificationData.target_users,
+      is_active: isActive,
+      created_at: notificationData.created_at,
+      date: notificationData.date,
+      time: notificationData.time,
+      status: notificationData.status
+    };
+    
+    console.log('Notificação convertida:', notification);
+    return notification;
+  } catch (error) {
+    console.error('Erro ao atualizar status da notificação:', error);
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.error || 'Falha ao atualizar status da notificação');
+    }
+    throw new Error('Falha ao atualizar status da notificação');
+  }
+}
+
 export const createNotification = async (
-  data: Omit<Notification, "id" | "created_at">
+  data: Omit<Notification, "id" | "created_at" | "date" | "time" | "status">
 ): Promise<Notification> => {
-  // TODO: Implementar integração com a API
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    ...data,
-    id: `notif${Date.now()}`,
-    created_at: new Date().toISOString()
-  };
+  try {
+    const now = new Date();
+    const apiData = {
+      ...data,
+      data: now.toISOString().split('T')[0],
+      hora: now.toTimeString().split(' ')[0],
+      status: 'active'
+    };
+
+    const response = await api.post('/api/admin/notificacao', apiData);
+    return convertApiNotification(response.data);
+  } catch (error) {
+    console.error('Erro ao criar notificação:', error);
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.error || 'Falha ao criar notificação');
+    }
+    throw new Error('Falha ao criar notificação');
+  }
 }
 
-// Função mock temporária para buscar notificação por ID
-export const getNotificationById = async (id: string): Promise<Notification | undefined> => {
-  const notifications = await getAllNotifications();
-  return notifications.find((notif) => notif.id === id);
+export const updateNotification = async (
+  id: string, 
+  data: Omit<Notification, "id" | "created_at" | "date" | "time" | "status">
+): Promise<Notification> => {
+  try {
+    const response = await api.put(`/api/admin/notificacao/${id}`, data);
+    return convertApiNotification(response.data);
+  } catch (error) {
+    console.error('Erro ao atualizar notificação:', error);
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.error || 'Falha ao atualizar notificação');
+    }
+    throw new Error('Falha ao atualizar notificação');
+  }
 }
 
-// Função mock temporária para atualizar notificação
-export const updateNotification = async (notification: Notification): Promise<Notification> => {
-  // TODO: Implementar integração com a API
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return notification;
-}
-
-// Função mock temporária para deletar notificação
 export const deleteNotification = async (id: string): Promise<void> => {
-  // TODO: Implementar integração com a API
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  try {
+    await api.delete(`/api/admin/notificacao/${id}`);
+  } catch (error) {
+    console.error('Erro ao deletar notificação:', error);
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.error || 'Falha ao deletar notificação');
+    }
+    throw new Error('Falha ao deletar notificação');
+  }
 }
 
-// Função helper para exibir destinatários
 export const getTargetUserNames = (notification: Notification): { text: string; color: string; } => {
   if (notification.target_type === "all") {
     return {

@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { api } from "@/services/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { ChevronDownIcon, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import AuthenticatedLayout from "@/components/authenticated-layout"
-import { mockWinnerResults, formatWinnerName, maskCpfForDisplay } from "@/lib/mock-results-data"
+
 import { formatCurrency } from "@/lib/utils"
 
 const ITEMS_PER_PAGE = 10 // Same as AffiliateExtractTab
@@ -13,19 +14,46 @@ const ITEMS_PER_PAGE = 10 // Same as AffiliateExtractTab
 export default function ResultadosPage() {
   const [selectedEdition, setSelectedEdition] = useState("Todas as Edições")
   const [currentPage, setCurrentPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [winners, setWinners] = useState([])
+
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchWinners = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const response = await api.get('/api/ganhadores')
+        
+        if (!response.data || !response.data.data) {
+          throw new Error('Formato de resposta inválido')
+        }
+        
+        setWinners(response.data.data)
+      } catch (error: any) {
+        console.error('Erro ao buscar ganhadores:', error)
+        setError(error?.message || 'Erro ao carregar os resultados')
+        setWinners([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchWinners()
+  }, [])
 
   const editions = useMemo(() => {
-    const uniqueEditions = new Set(mockWinnerResults.map((winner) => winner.edition))
+    const uniqueEditions = new Set(winners.map((winner) => winner.edicao))
     return ["Todas as Edições", ...Array.from(uniqueEditions)].sort()
-  }, [])
+  }, [winners])
 
   const filteredWinners = useMemo(() => {
     if (selectedEdition === "Todas as Edições") {
-      return mockWinnerResults
+      return winners
     }
-    return mockWinnerResults.filter((winner) => winner.edition === selectedEdition)
-  }, [selectedEdition])
+    return winners.filter((winner) => winner.edicao === selectedEdition)
+  }, [selectedEdition, winners])
 
   // Paginação
   const totalPages = Math.ceil(filteredWinners.length / ITEMS_PER_PAGE)
@@ -91,6 +119,10 @@ export default function ResultadosPage() {
             <div className="flex justify-center items-center h-40">
               <Loader2 className="h-8 w-8 animate-spin text-[#9FFF00]" />
             </div>
+          ) : error ? (
+            <div className="text-center text-red-400 py-10">
+              {error}
+            </div>
           ) : paginatedWinners.length === 0 ? (
             <div className="text-center text-gray-400 py-10">
               Nenhum ganhador encontrado para o período selecionado.
@@ -99,22 +131,45 @@ export default function ResultadosPage() {
             <div className="space-y-3">
               {paginatedWinners.map((winner, index) => (
                 <div
-                  key={winner.id}
-                  className={`flex flex-col p-3 bg-[#1a323a] rounded-lg
-                    ${index < paginatedWinners.length - 1 ? "border-b border-gray-800 pb-3" : ""}
-                  `}
+                  key={`${winner.cpf}-${winner.numero_titulo}-${index}`}
+                  className="group relative overflow-hidden bg-gradient-to-br from-[#1a323a] to-[#1E2530] rounded-lg p-4 transition-all duration-300 hover:shadow-lg hover:shadow-[#9FFF00]/10 border border-gray-800/50"
                 >
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="text-sm font-medium text-white">{formatWinnerName(winner.name)}</p>
-                    <p className="text-sm font-medium text-[#9FFF00]">{formatCurrency(winner.prizeValue)}</p>
+                  {/* Badge do Tipo */}
+                  <div className={`absolute top-0 right-0 px-3 py-1 text-xs font-semibold rounded-bl-lg
+                    ${winner.tipo === 'instantaneo' 
+                      ? 'bg-purple-500/20 text-purple-300 border-l border-b border-purple-500/20' 
+                      : 'bg-blue-500/20 text-blue-300 border-l border-b border-blue-500/20'}`}
+                  >
+                    {winner.tipo === 'instantaneo' ? 'Instantâneo' : 'Sorteio'}
                   </div>
-                  <div className="flex justify-between items-center text-xs text-gray-400">
-                    <span>CPF: {maskCpfForDisplay(winner.cpf)}</span>
-                    <span>Número da Sorte: {winner.luckyNumber}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
-                    <span>Tipo: {winner.prizeType}</span>
-                    <span>Edição: {winner.edition}</span>
+
+                  {/* Informações Principais */}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-start mt-4">
+                      <div>
+                        <h3 className="text-white font-semibold">{winner.nome}</h3>
+                        <p className="text-gray-400 text-sm">{winner.cpf}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[#9FFF00] font-bold">
+                          {`R$ ${Number(winner.valor_premio).toLocaleString('pt-BR', { 
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}`}
+                        </p>
+                        <p className="text-gray-400 text-sm">Nº {winner.numero_titulo}</p>
+                      </div>
+                    </div>
+
+                    {/* Detalhes Adicionais */}
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-700/50">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400">{winner.edicao}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {new Date(winner.data_premiacao).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}

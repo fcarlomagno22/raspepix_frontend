@@ -10,6 +10,12 @@ export const maskCPF = (value: string) => {
   return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-${cleaned.slice(9, 11)}`
 }
 
+export const maskCEP = (value: string) => {
+  const cleaned = value.replace(/\D/g, "")
+  if (cleaned.length <= 5) return cleaned
+  return `${cleaned.slice(0, 5)}-${cleaned.slice(5, 8)}`
+}
+
 export const maskDate = (value: string) => {
   const cleaned = value.replace(/\D/g, "")
   if (cleaned.length <= 2) return cleaned

@@ -13,6 +13,7 @@ import { PencilIcon, Loader2, CheckIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { z } from "zod"
+import { SUPABASE_URLS } from "@/config/supabase-urls"
 
 // Schema de validação do telefone
 const phoneSchema = z
@@ -179,7 +180,7 @@ export default function ProfileCard() {
       <div className="flex flex-col items-center -mt-12">
         <div className="w-24 h-24 rounded-full border-4 border-[#9FFF00]/20 overflow-hidden bg-[#232D3F] relative">
           <Image
-            src={profile.profile_picture || "https://kvwnpmdhyhrmfpgnojbh.supabase.co/storage/v1/object/public/raspepix//ripo_3x4.png"}
+                            src={profile.profile_picture || SUPABASE_URLS.IMAGES.RIPO_3X4}
             alt="Foto de Perfil"
             fill
             className="object-cover"

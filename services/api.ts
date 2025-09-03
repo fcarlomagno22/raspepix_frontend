@@ -1,90 +1,138 @@
 import axios from 'axios';
+import { API_CONFIG } from '@/config/api';
 import Cookies from 'js-cookie';
-import type { Notification } from "@/types/notification"
 
-// Configuração base do axios
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://raspepixbackend-production.up.railway.app',
-  headers: {
+  baseURL: 'http://localhost:3000',
+  withCredentials: true,
+  headers: { 
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    'X-XSRF-TOKEN': Cookies.get('XSRF-TOKEN'),
   }
 });
 
-// Método fetch para compatibilidade com código existente
-api.fetch = async (url: string, options: RequestInit = {}) => {
-  try {
-    const method = options.method?.toLowerCase() || 'get';
-    const body = options.body ? JSON.parse(options.body as string) : undefined;
+// Interceptor para adicionar o token de autorização
+api.interceptors.request.use(
+  config => {
+    const isAdminRoute = config.url?.includes('/api/admin') || config.url?.includes('/api/sorteio/admin') || config.url?.includes('/api/transacoes/admin');
     
-    const response = await api({
-      url: url.replace(api.defaults.baseURL || '', ''),
-      method,
-      data: body,
-      headers: options.headers
+    // Atualiza o XSRF token em cada requisição
+    const xsrfToken = Cookies.get('XSRF-TOKEN');
+    if (xsrfToken) {
+      config.headers['X-XSRF-TOKEN'] = xsrfToken;
+    }
+
+    if (isAdminRoute) {
+      const adminToken = Cookies.get('admin_token');
+      const supabaseToken = Cookies.get('sb-kvwnpmdhyhrmfpgnojbh-auth-token');
+      
+      if (adminToken) {
+        config.headers['Authorization'] = `Bearer ${adminToken}`;
+        console.log('[API Interceptor] Using admin token');
+      } else if (supabaseToken) {
+        try {
+          const parsedToken = JSON.parse(supabaseToken);
+          config.headers['Authorization'] = `Bearer ${parsedToken.access_token}`;
+          console.log('[API Interceptor] Using Supabase token');
+        } catch (err) {
+          console.warn('[API Interceptor] Failed to parse Supabase token:', err);
+        }
+      } else {
+        console.warn('[API Interceptor] No valid token found for admin route');
+      }
+    } else {
+      const token = Cookies.get('access_token');
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+
+    // Log para debug
+    console.log('[API Request]', {
+      url: config.url,
+      method: config.method,
+      isAdminRoute,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      headers: {
+        ...config.headers,
+        Authorization: config.headers.Authorization ? 'Bearer [REDACTED]' : undefined
+      }
+    });
+    
+    return config;
+  },
+  error => {
+    console.error('[API Interceptor] Request error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor para tratar erros de autenticação
+api.interceptors.response.use(
+  response => response,
+  error => {
+    // Log detalhado do erro
+    console.error('API Error Details:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.config?.headers,
+      error: error.message
     });
 
-    return {
-      ok: true,
-      status: response.status,
-      json: async () => response.data,
-      text: async () => JSON.stringify(response.data)
-    };
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      return {
-        ok: false,
-        status: error.response?.status || 500,
-        json: async () => error.response?.data || {},
-        text: async () => JSON.stringify(error.response?.data || {})
-      };
+    // Tratamento para usuário bloqueado
+    if (error.response?.status === 403) {
+      return Promise.reject(new Error(error.response.data.message || 'Sua conta está bloqueada. Entre em contato conosco.'));
     }
-    throw error;
-  }
-};
 
-// Interceptor para adicionar token
-api.interceptors.request.use((config) => {
-  const isAdminRoute = config.url?.includes('/api/admin/') || 
-                      config.url?.includes('/api/notificacao/admin') ||
-                      config.url?.includes('/api/sorteio/edicoes');
-                      
-  const token = isAdminRoute ? Cookies.get('admin_token') : Cookies.get('access_token');
-  
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  
-  return config;
-});
-
-// Interceptor para tratamento de erros
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+    // Tratamento para erros de autenticação (401)
     if (error.response?.status === 401) {
-      // Não autorizado
-      const isAdminRoute = error.config.url?.includes('/api/admin/') || 
-                          error.config.url?.includes('/api/notificacao/admin') ||
-                          error.config.url?.includes('/api/sorteio/edicoes');
+      const isAdminRoute = error.config?.url?.includes('/api/admin');
+      const isLoginRoute = error.config?.url?.includes('/api/auth/login');
       
-      throw new Error(isAdminRoute 
-        ? 'Sessão de administrador expirada. Por favor, faça login novamente.'
-        : 'Não autorizado. Por favor, faça login novamente.'
-      );
+      // Se for rota de login, é erro de credenciais
+      if (isLoginRoute) {
+        return Promise.reject(new Error('Email ou senha incorretos'));
+      }
+      
+      // Se for rota admin, mantém comportamento atual
+      if (isAdminRoute) {
+        return Promise.reject(new Error('Sessão expirada. Por favor, faça login novamente.'));
+      }
+      
+      // Para outras rotas, é sessão expirada
+      Cookies.remove('access_token');
+      window.location.href = '/login';
+      return Promise.reject(new Error('Sessão expirada'));
     }
 
-    if (error.response?.status === 404) {
-      throw new Error('Recurso não encontrado. Verifique a URL da API.');
+    // Se houver uma mensagem de erro específica da API
+    if (error.response?.data?.error) {
+      return Promise.reject(new Error(error.response.data.error));
     }
-    
-    if (error.response?.status === 500) {
-      throw new Error(error.response.data?.error || 'Erro interno do servidor. Tente novamente mais tarde.');
+
+    // Se for um erro de rede
+    if (error.request) {
+      return Promise.reject(new Error('Erro de conexão com o servidor'));
     }
-    
-    throw error;
-      }
+
+    return Promise.reject(new Error('Ocorreu um erro inesperado'));
+  }
 );
+
+// Tipos e interfaces
+export interface LoginResponse {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  message: string;
+}
 
 export interface UserNotificationsResponse {
   notifications: {
@@ -105,120 +153,102 @@ export interface UserNotificationsResponse {
   totalPages: number;
 }
 
+export interface AdminUsersResponse {
+  message: string;
+  data: {
+    id: string;
+    full_name: string;
+    cpf: string;
+    email: string;
+    gender: string;
+    birth_date: string;
+    phone: string;
+    state_uf: string | null;
+    city: string | null;
+    idade: number;
+    is_active: boolean;
+    created_at: string;
+  }[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+// Helper para extrair mensagem de erro
+export const getErrorMessage = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    // Prioriza a mensagem do backend
+    const backendMessage = error.response?.data?.message;
+    if (backendMessage) return backendMessage;
+    
+    // Se não houver mensagem específica, verifica se é erro de usuário bloqueado
+    if (error.response?.status === 403) {
+      return 'Sua conta está bloqueada. Chame a gente em contato@raspepix.com.br para saber mais.';
+    }
+    
+    return error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'Um erro inesperado ocorreu';
+};
+
 export const getUserNotifications = async (page: number = 1): Promise<UserNotificationsResponse> => {
   try {
-    const response = await api.get('/api/notificacao', {
-      params: { 
-        page,
-        limit: 10
-      }
+    const response = await api.get<UserNotificationsResponse>('/api/notificacao', {
+      params: { page, limit: 10 },
     });
     
+    // Verifica se a resposta tem a estrutura esperada
+    if (!response.data || !Array.isArray(response.data.notifications)) {
+      throw new Error('Formato de resposta inválido');
+    }
+    
     return response.data;
-  } catch (error) {
-    console.error('Erro ao buscar notificações:', error);
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.error || 'Não foi possível carregar suas notificações. Por favor, tente novamente.');
-      }
-    throw error;
-  }
-}
+  } catch (error: any) {
+    // Log mais detalhado do erro
+    console.error('Erro completo ao buscar notificações:', {
+      error,
+      response: error.response,
+      request: error.request,
+      config: error.config
+    });
 
-// Mantendo as outras funções existentes mas adaptando para usar o axios
-export const createNotification = async (notification: Omit<Notification, "id" | "created_at" | "date" | "time" | "status">) => {
-  try {
-    const payload = {
-      title: notification.title,
-      message: notification.message,
-      target_type: notification.target_type,
-      is_active: true,
-      target_users: notification.target_type === "selected" ? notification.target_users : undefined,
-      single_user_id: notification.target_type === "single" ? notification.single_user_id : undefined
-    };
-
-    const response = await api.post('/api/notificacao', payload);
-    return response.data.notification;
-  } catch (error) {
-    console.error('Erro ao criar notificação:', error);
-    throw new Error('Não foi possível criar a notificação. Por favor, tente novamente.');
-  }
-} 
-
-export const updateNotification = async (
-  id: string,
-  notification: Omit<Notification, "id" | "created_at" | "date" | "time" | "status">
-) => {
-  try {
-    const payload = {
-      title: notification.title,
-      message: notification.message,
-      target_type: notification.target_type || "all",
-      is_active: notification.is_active,
-      target_users: notification.target_users || [],
-      single_user_id: notification.single_user_id || null
-    };
-
-    const response = await api.put(`/api/notificacao/${id}`, payload);
-    return response.data.notification;
-  } catch (error) {
-    console.error('Erro ao atualizar notificação:', error);
-    throw new Error('Não foi possível salvar as alterações. Por favor, tente novamente mais tarde.');
-  }
-} 
-
-export const deleteNotification = async (id: string) => {
-  try {
-    await api.delete(`/api/notificacao/${id}`);
-    return true;
-  } catch (error) {
-    console.error('Erro ao excluir notificação:', error);
-    throw new Error('Não foi possível excluir a notificação. Por favor, tente novamente.');
-  }
-} 
-
-export const hideNotification = async (id: string) => {
-  try {
-    const response = await api.patch(`/api/notificacao/${id}/ocultar`);
-    return response.data.notification;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      if (error.response?.status === 404) {
-        throw new Error('Notificação não encontrada.');
-      }
-      throw new Error(error.response?.data?.error || 'Erro ao ocultar notificação');
+    // Se houver uma resposta da API com mensagem de erro
+    if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
     }
-    throw error;
+
+    // Se for um erro de rede
+    if (error.request) {
+      throw new Error('Erro de conexão com o servidor');
+    }
+
+    // Para outros tipos de erro
+    throw new Error('Não foi possível carregar suas notificações. Por favor, tente novamente.');
   }
 };
 
-export const markNotificationAsRead = async (id: string) => {
+export const hideNotification = async (notificationId: string): Promise<Notification> => {
   try {
-    const response = await api.patch(`/api/notificacao/${id}/visualizar`);
+    const response = await api.patch<{ notification: Notification }>(`/api/notificacao/${notificationId}/ocultar`);
     return response.data.notification;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      if (error.response?.status === 404) {
-        throw new Error('Notificação não encontrada.');
-      }
-      throw new Error(error.response?.data?.error || 'Erro ao marcar notificação como lida');
-    }
-    throw error;
+  } catch (error: any) {
+    console.error('Erro ao ocultar notificação:', error);
+    throw new Error(error.response?.data?.error || 'Não foi possível ocultar a notificação. Por favor, tente novamente.');
   }
 };
 
-export interface ApiUser {
-  full_name: string
-  cpf: string
-  uuid: string
-}
-
-export const getUsers = async (): Promise<{ users: ApiUser[] }> => {
+export const getAdminUsers = async (page: number = 1): Promise<AdminUsersResponse> => {
   try {
-    const response = await api.get('/api/admin/usuarios');
-    const { data } = response.data;
-    return { users: data };
-  } catch (error) {
+    const response = await api.get<AdminUsersResponse>('/api/admin/usuarios', {
+      params: { page }
+    });
+    return response.data;
+  } catch (error: any) {
     console.error('Erro ao buscar usuários:', error);
-    throw new Error('Não foi possível carregar a lista de usuários');
+    throw new Error(error.response?.data?.error || 'Não foi possível carregar a lista de usuários. Por favor, tente novamente.');
   }
-} 
+}; 

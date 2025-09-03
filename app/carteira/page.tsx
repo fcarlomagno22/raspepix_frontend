@@ -81,12 +81,12 @@ function WalletPageContent() {
       <main className="flex-1 pb-32 md:pb-40 px-3 md:px-4 lg:px-8 max-w-full md:max-w-6xl mx-auto w-full">
         {/* Seção de Saldos Replicada */}
         <BalancesSection
-          saldoParaJogar={50} // Hardcoded to 50 fichas
-          saldoSacavel={500} // Hardcoded to R$ 500,00
+          saldoParaJogar={profile?.saldo_para_jogar || 0}
+          saldoSacavel={profile?.saldo_sacavel || 0}
           onOpenDepositModal={handleOpenDepositModal}
           onOpenTransferModal={handleOpenTransferModal}
           onWithdrawSuccess={handleWithdrawSuccess}
-          className="mt-4 md:mt-6" // Apply the margin-top here
+          className="mt-4 md:mt-6"
         />
 
         {/* Histórico de Transações */}
@@ -137,7 +137,7 @@ function WalletPageContent() {
 
           {/* Componente de Histórico de Transações */}
           {profile && (
-            <TransactionHistory type={selectedFilter} userId={profile.id} itemsPerPage={5} showLuckyNumbers={true} />
+            <TransactionHistory type={selectedFilter} userId={profile.id} itemsPerPage={25} />
           )}
         </motion.div>
       </main>

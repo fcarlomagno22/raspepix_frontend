@@ -7,8 +7,8 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
+    domains: ['kvwnpmdhyhrmfpgnojbh.supabase.co', 'wrivivjqxeulafrgdrsf.supabase.co', 'localhost'],
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

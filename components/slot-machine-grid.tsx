@@ -438,25 +438,36 @@ export function SlotMachineGrid({
                 animate={
                   isHighlighted
                     ? {
-                        scale: [1, 1.15, 1], // Pulso de escala mais pronunciado
-                        rotateZ: [0, 2, -2, 0], // Rotação sutil
-                        boxShadow: [
-                          "0 0 20px #9ffe00", // Brilho inicial verde
-                          "0 0 30px #ffeb3b", // Brilho mais intenso amarelo
-                          "0 0 20px #9ffe00", // Volta ao verde
-                        ],
+                        scale: 1.15,
+                        rotateZ: [-2, 2],
+                        boxShadow: ["0 0 20px #9ffe00", "0 0 30px #ffeb3b"],
                       }
-                    : { scale: 1, rotateZ: 0, boxShadow: "none" }
+                    : { 
+                        scale: 1, 
+                        rotateZ: 0, 
+                        boxShadow: "none" 
+                      }
                 }
                 transition={
                   isHighlighted
                     ? {
-                        type: "spring",
-                        stiffness: 200, // Um pouco mais rígido para um pulso rápido
-                        damping: 15,
-                        repeat: Number.POSITIVE_INFINITY,
-                        repeatType: "mirror",
-                        duration: 0.8, // Duração total da animação de um ciclo
+                        scale: {
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 10,
+                          repeat: Number.POSITIVE_INFINITY,
+                          repeatType: "reverse"
+                        },
+                        rotateZ: {
+                          duration: 0.5,
+                          repeat: Number.POSITIVE_INFINITY,
+                          repeatType: "reverse"
+                        },
+                        boxShadow: {
+                          duration: 0.8,
+                          repeat: Number.POSITIVE_INFINITY,
+                          repeatType: "reverse"
+                        }
                       }
                     : {}
                 }

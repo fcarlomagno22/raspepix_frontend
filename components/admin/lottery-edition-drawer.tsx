@@ -223,10 +223,12 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState("general-info")
-  const [importedCapitalizadoraFileContent, setImportedCapitalizadoraFileContent] = useState<string | null>(null)
+  const [importedInstantPrizesFileContent, setImportedInstantPrizesFileContent] = useState<string | null>(null)
   const [generatedPrizeTickets, setGeneratedPrizeTickets] = useState<
     { ticketNumber: string; prizeValue: number }[]
   >([])
+  const [generatedCapitalizadoraNumbers, setGeneratedCapitalizadoraNumbers] = useState<string[]>([])
+  const [capitalizadoraQuantity, setCapitalizadoraQuantity] = useState<number>(10000000)
 
   // Estados para paginação
   const [currentInstantPrizePage, setCurrentInstantPrizePage] = useState(1)
@@ -246,14 +248,14 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
   const handlePrizePageChange = (page: number) => setCurrentInstantPrizePage(page)
   const handleCapitalizadoraPageChange = (page: number) => setCurrentCapitalizadoraPage(page)
 
-  // Memoized function for generating capitalizadora numbers for display
-  const displayedCapitalizadoraNumbers = useMemo(() => {
-    if (!importedCapitalizadoraFileContent) return []
+  // Memoized function for generating instant prizes numbers for display
+  const displayedInstantPrizesNumbers = useMemo(() => {
+    if (!importedInstantPrizesFileContent) return []
 
     const numbers: { number: string; isPrize: boolean; prizeValue?: string; isUsed: boolean }[] = []
     
     // Separar por linhas e processar cada linha
-    const lines = importedCapitalizadoraFileContent
+    const lines = importedInstantPrizesFileContent
       .split(/[\n,]/) // Separar por nova linha ou vírgula
       .map(line => line.trim())
       .filter(line => line.length > 0)
@@ -287,7 +289,7 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
 
     // Ordenar por número
     return numbers.sort((a, b) => a.number.localeCompare(b.number))
-  }, [importedCapitalizadoraFileContent])
+  }, [importedInstantPrizesFileContent])
 
   // Dados paginados
   const paginatedPrizeTickets = useMemo(
@@ -295,9 +297,14 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
     [generatedPrizeTickets, currentInstantPrizePage]
   )
 
+  const paginatedInstantPrizesNumbers = useMemo(
+    () => getPaginatedData(displayedInstantPrizesNumbers, currentInstantPrizePage),
+    [displayedInstantPrizesNumbers, currentInstantPrizePage]
+  )
+
   const paginatedCapitalizadoraNumbers = useMemo(
-    () => getPaginatedData(displayedCapitalizadoraNumbers, currentCapitalizadoraPage),
-    [displayedCapitalizadoraNumbers, currentCapitalizadoraPage]
+    () => getPaginatedData(generatedCapitalizadoraNumbers, currentCapitalizadoraPage),
+    [generatedCapitalizadoraNumbers, currentCapitalizadoraPage]
   )
 
   const form = useForm<FormValues>({
@@ -348,7 +355,7 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
       setMaxInstantPrizeValueDisplayValue(formatNumberWithDecimalSeparator(edition.maxInstantPrizeValue))
 
       if (edition.capitalizadoraWinningNumbersInput) {
-        setImportedCapitalizadoraFileContent(edition.capitalizadoraWinningNumbersInput)
+        setImportedInstantPrizesFileContent(edition.capitalizadoraWinningNumbersInput)
       }
       // Re-generate prize tickets for display if generatedInstantPrizes exists
       if (edition.generatedInstantPrizes && edition.generatedInstantPrizes.length > 0) {
@@ -393,25 +400,27 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
       setMinInstantPrizeValueDisplayValue("")
       setMaxInstantPrizeValueDisplayValue("")
 
-      setImportedCapitalizadoraFileContent(null)
+      setImportedInstantPrizesFileContent(null)
       setGeneratedPrizeTickets([])
+      setGeneratedCapitalizadoraNumbers([])
+      setCapitalizadoraQuantity(10000000)
     }
   }, [edition, form])
 
-  // Handle file upload for capitalizadora numbers
-  const handleFileChange = useCallback(
+  // Handle file upload for instant prizes numbers
+  const handleInstantPrizesFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       if (file) {
         const reader = new FileReader()
         reader.onload = (e) => {
           const content = e.target?.result as string
-          setImportedCapitalizadoraFileContent(content)
+          setImportedInstantPrizesFileContent(content)
           form.setValue("capitalizadoraWinningNumbersInput", content, { shouldValidate: true })
         }
         reader.readAsText(file)
       } else {
-        setImportedCapitalizadoraFileContent(null)
+        setImportedInstantPrizesFileContent(null)
         form.setValue("capitalizadoraWinningNumbersInput", "", { shouldValidate: true })
       }
     },
@@ -537,6 +546,18 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
     setGeneratedPrizeTickets(newGeneratedPrizeTickets)
   }
 
+  const handleGenerateCapitalizadoraNumbers = () => {
+    const totalNumbers = capitalizadoraQuantity
+    const numbers: string[] = []
+    
+    // Gerar números de 00000001 até a quantidade definida
+    for (let i = 1; i <= totalNumbers; i++) {
+      numbers.push(String(i).padStart(8, '0'))
+    }
+    
+    setGeneratedCapitalizadoraNumbers(numbers)
+  }
+
   const onSubmit: SubmitHandler<FormValues> = async (values) => {
     try {
       setIsSubmitting(true)
@@ -562,23 +583,25 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
             valor_premio: ticket.prizeValue
           })),
         importacao: {
-          nome_arquivo: importedCapitalizadoraFileContent ? "numeros_importados.csv" : "",
-          url_arquivo: importedCapitalizadoraFileContent ? "https://storage.supabase.co/sorteios-bucket/uploads/2024/sorteios/numeros_importados.csv" : ""
+          nome_arquivo: importedInstantPrizesFileContent ? "numeros_premios_instantaneos.csv" : "",
+          url_arquivo: importedInstantPrizesFileContent ? "https://storage.supabase.co/sorteios-bucket/uploads/2024/sorteios/numeros_premios_instantaneos.csv" : ""
         },
-        numerosImportados: displayedCapitalizadoraNumbers.map(num => ({
+        numerosImportados: displayedInstantPrizesNumbers.map(num => ({
           numero: num.number,
           premiado: num.isPrize,
           descricao_premio: num.isPrize ? num.prizeValue : "Não Premiado"
+        })),
+        numerosCapitalizadora: generatedCapitalizadoraNumbers.map(num => ({
+          numero: num,
+          premiado: false, // Capitalizadora não define prêmios, é via loteria federal
+          descricao_premio: "Prêmio via Loteria Federal"
         }))
       }
 
       // Fazer a chamada à API usando o novo serviço
-      const response = await api.fetch('http://localhost:3000/api/sorteio/edicoes', {
-        method: 'POST',
-        body: JSON.stringify(requestData)
-      })
+      const response = await api.post('/api/sorteio/admin/edicoes', requestData);
 
-      const data = await response.json()
+      const data = response.data;
       
       // Se chegou aqui, deu tudo certo
       toast({
@@ -903,16 +926,115 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
                   </div>
                 </div>
 
-                <Button
-                  type="button"
-                  onClick={handleGenerateInstantPrizes}
-                  className="bg-[#9FFF00]/20 text-[#9FFF00] hover:bg-[#9FFF00]/30"
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Gerar Grade de Prêmios
-                </Button>
+                <div className="flex gap-4">
+                  <Button
+                    type="button"
+                    onClick={handleGenerateInstantPrizes}
+                    className="bg-[#9FFF00]/20 text-[#9FFF00] hover:bg-[#9FFF00]/30"
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Gerar Grade de Prêmios
+                  </Button>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="instantPrizesFile"
+                      type="file"
+                      accept=".txt,.csv"
+                      onChange={handleInstantPrizesFileChange}
+                      className="bg-[#1A2430] border-[#9FFF00]/20 text-white file:text-[#9FFF00] file:bg-[#1A2430] file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md hover:file:bg-[#232A34]"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setImportedInstantPrizesFileContent(null)
+                        form.setValue("capitalizadoraWinningNumbersInput", "")
+                        const fileInput = document.getElementById("instantPrizesFile") as HTMLInputElement
+                        if (fileInput) fileInput.value = ""
+                      }}
+                      className="border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-[#9FFF00]/10"
+                      disabled={!importedInstantPrizesFileContent}
+                    >
+                      Limpar Arquivo
+                    </Button>
+                  </div>
+                </div>
 
                 {form.formState.errors.generatedInstantPrizes && (
                   <p className="text-red-500 text-sm">{form.formState.errors.generatedInstantPrizes.message}</p>
+                )}
+
+                {/* Tabela de Números Importados */}
+                {importedInstantPrizesFileContent && (
+                  <div className="space-y-2 mt-6 p-4 border border-[#232A34] rounded-lg bg-[#1A2430]">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-md font-semibold text-[#9FFF00]">Números Importados dos Prêmios Instantâneos</h4>
+                    </div>
+                    <p className="text-gray-400 text-sm">Total de Números: {displayedInstantPrizesNumbers.length}</p>
+                    <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-[#1A2430] hover:bg-[#1A2430]">
+                            <TableHead className="text-gray-300">Número</TableHead>
+                            <TableHead className="text-gray-300">É Premiado?</TableHead>
+                            <TableHead className="text-gray-300">Prêmio</TableHead>
+                            <TableHead className="text-gray-300">Usado?</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedInstantPrizesNumbers.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-gray-400">
+                                Nenhum número para exibir.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            paginatedInstantPrizesNumbers.map((numData, index) => (
+                              <TableRow key={index} className="border-[#232A34] hover:bg-[#232A34]">
+                                <TableCell className="font-medium text-white">{numData.number}</TableCell>
+                                <TableCell>
+                                  {numData.isPrize ? (
+                                    <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                                  ) : (
+                                    <span className="text-gray-500">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-white">{numData.prizeValue || "-"}</TableCell>
+                                <TableCell className="text-center">
+                                  {numData.isUsed ? (
+                                    <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
+                                  ) : (
+                                    <span className="text-gray-500">-</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="flex justify-center items-center gap-2 mt-4">
+                      <Button
+                        type="button"
+                        onClick={() => handlePrizePageChange(currentInstantPrizePage - 1)}
+                        disabled={currentInstantPrizePage === 1}
+                        className="bg-[#9FFF00]/20 text-[#9FFF00] hover:bg-[#9FFF00]/30"
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-white">
+                        Página {currentInstantPrizePage} de {getTotalPages(displayedInstantPrizesNumbers.length)}
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={() => handlePrizePageChange(currentInstantPrizePage + 1)}
+                        disabled={currentInstantPrizePage >= getTotalPages(displayedInstantPrizesNumbers.length)}
+                        className="bg-[#9FFF00]/20 text-[#9FFF00] hover:bg-[#9FFF00]/30"
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 {/* Tabela de Prêmios Instantâneos */}
@@ -983,88 +1105,62 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
               {/* Tab: Números da Capitalizadora */}
               <TabsContent value="capitalizadora-numbers" className="space-y-6">
                 <div className="grid gap-2">
-                  <Label htmlFor="capitalizadoraFile" className="text-gray-300">
-                    Importar Números Premiados da Capitalizadora (.txt, .csv)
+                  <Label htmlFor="capitalizadoraQuantity" className="text-gray-300">
+                    Quantidade de Números da Capitalizadora
                   </Label>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      id="capitalizadoraFile"
-                      type="file"
-                      accept=".txt,.csv"
-                      onChange={handleFileChange}
-                      className="bg-[#1A2430] border-[#9FFF00]/20 text-white file:text-[#9FFF00] file:bg-[#1A2430] file:border-0 file:mr-4 file:py-2 file:px-4 file:rounded-md hover:file:bg-[#232A34]"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setImportedCapitalizadoraFileContent(null)
-                        form.setValue("capitalizadoraWinningNumbersInput", "")
-                        const fileInput = document.getElementById("capitalizadoraFile") as HTMLInputElement
-                        if (fileInput) fileInput.value = "" // Clear the file input
-                      }}
-                      className="border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-[#9FFF00]/10"
-                      disabled={!importedCapitalizadoraFileContent}
-                    >
-                      Limpar Arquivo
-                    </Button>
-                  </div>
+                  <Input
+                    id="capitalizadoraQuantity"
+                    type="text"
+                    placeholder="10.000.000"
+                    value={typeof capitalizadoraQuantity === "number" ? formatNumberWithThousandsSeparator(capitalizadoraQuantity) : ""}
+                    onChange={(e) => {
+                      const parsedValue = parseNumberFromFormattedString(e.target.value)
+                      setCapitalizadoraQuantity(parsedValue)
+                    }}
+                    className="bg-[#1A2430] border-[#9FFF00]/20 text-white"
+                  />
                   <p className="text-sm text-gray-400">
-                    Importe um arquivo de texto (.txt) ou CSV (.csv) contendo os números premiados, separados por
-                    vírgula ou nova linha.
+                    Defina a quantidade de números que a capitalizadora deve gerar (de 00000001 até a quantidade definida). Os prêmios são definidos pela Loteria Federal, não pela capitalizadora.
                   </p>
-                  {form.formState.errors.capitalizadoraWinningNumbersInput && (
-                    <p className="text-red-500 text-sm">
-                      {form.formState.errors.capitalizadoraWinningNumbersInput.message}
-                    </p>
-                  )}
                 </div>
 
-                {importedCapitalizadoraFileContent && ( // Only show preview if content is imported
+                <Button
+                  type="button"
+                  onClick={handleGenerateCapitalizadoraNumbers}
+                  className="bg-[#9FFF00]/20 text-[#9FFF00] hover:bg-[#9FFF00]/30"
+                  disabled={capitalizadoraQuantity <= 0}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Gerar Grade de Números da Capitalizadora
+                </Button>
+
+                {generatedCapitalizadoraNumbers.length > 0 && (
                   <div className="space-y-2 mt-6 p-4 border border-[#232A34] rounded-lg bg-[#1A2430]">
                     <h4 className="text-md font-semibold text-[#9FFF00]">
-                      Prévia dos Números da Capitalizadora (Amostra)
+                      Grade de Números da Capitalizadora (Amostra)
                     </h4>
-                    <p className="text-gray-400 text-sm">Exibindo uma amostra de 1.000 números do total de 10.000.000.</p>
+                    <p className="text-gray-400 text-sm">
+                      Exibindo uma amostra de 1.000 números do total de {generatedCapitalizadoraNumbers.length.toLocaleString()} (00000001 até {String(capitalizadoraQuantity).padStart(8, '0')}).
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      <strong>Nota:</strong> Os prêmios são definidos pela Loteria Federal, não pela capitalizadora.
+                    </p>
                     <div className="max-h-64 overflow-y-auto custom-scrollbar">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-[#1A2430] hover:bg-[#1A2430]">
                             <TableHead className="text-gray-300">Número</TableHead>
-                            <TableHead className="text-gray-300">É Premiado?</TableHead>
+                            <TableHead className="text-gray-300">Status</TableHead>
                             <TableHead className="text-gray-300">Prêmio</TableHead>
-                            <TableHead className="text-gray-300">Usado?</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {paginatedCapitalizadoraNumbers.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center text-gray-400">
-                                Nenhum número para exibir.
-                              </TableCell>
+                          {paginatedCapitalizadoraNumbers.map((number, index) => (
+                            <TableRow key={index} className="border-[#232A34] hover:bg-[#232A34]">
+                              <TableCell className="font-medium text-white">{number}</TableCell>
+                              <TableCell className="text-white">Disponível</TableCell>
+                              <TableCell className="text-white">Via Loteria Federal</TableCell>
                             </TableRow>
-                          ) : (
-                            paginatedCapitalizadoraNumbers.map((numData, index) => (
-                              <TableRow key={index} className="border-[#232A34] hover:bg-[#232A34]">
-                                <TableCell className="font-medium text-white">{numData.number}</TableCell>
-                                <TableCell>
-                                  {numData.isPrize ? (
-                                    <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
-                                  ) : (
-                                    <span className="text-gray-500">-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-white">{numData.prizeValue || "-"}</TableCell>
-                                <TableCell className="text-center">
-                                  {numData.isUsed ? (
-                                    <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />
-                                  ) : (
-                                    <span className="text-gray-500">-</span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
+                          ))}
                         </TableBody>
                       </Table>
                     </div>
@@ -1078,12 +1174,12 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
                         Anterior
                       </Button>
                       <span className="text-white">
-                        Página {currentCapitalizadoraPage} de {getTotalPages(displayedCapitalizadoraNumbers.length)}
+                        Página {currentCapitalizadoraPage} de {getTotalPages(generatedCapitalizadoraNumbers.length)}
                       </span>
                       <Button
                         type="button"
                         onClick={() => handleCapitalizadoraPageChange(currentCapitalizadoraPage + 1)}
-                        disabled={currentCapitalizadoraPage >= getTotalPages(displayedCapitalizadoraNumbers.length)}
+                        disabled={currentCapitalizadoraPage >= getTotalPages(generatedCapitalizadoraNumbers.length)}
                         className="bg-[#9FFF00]/20 text-[#9FFF00] hover:bg-[#9FFF00]/30"
                       >
                         Próxima

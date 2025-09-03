@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import DepositModal from "@/components/deposit-modal"
 import BalancesSection from "@/components/balances-section"
@@ -12,36 +13,79 @@ import TransferModal from "@/components/transfer-modal"
 import { useAudioPlayer } from "@/contexts/audio-player-context"
 import AuthenticatedLayout from "@/components/authenticated-layout"
 import { api } from "@/services/api"
+import { getMusicas } from "@/services/musica"
+import type { Musica, MusicaResponse } from "@/types/musica"
 
 interface Winner {
-  id: number
-  name: string
-  prize: string
-  video: string
+  id: number;
+  name: string;
+  prize: string;
+  video: string;
+}
+
+interface ParticleElement {
+  key: string;
+  element: React.ReactElement;
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [showDepositModal, setShowDepositModal] = useState(false)
   const [showTransferModal, setShowTransferModal] = useState(false)
-  const [saldoParaJogar, setSaldoParaJogar] = useState(50.0)
+  const [saldoParaJogar, setSaldoParaJogar] = useState(0)
   const [saldoSacavel, setSaldoSacavel] = useState(500.0)
-  const [particles2, setParticles2] = useState<JSX.Element[]>([])
-  const [pluralParticles, setPluralParticles] = useState<JSX.Element[]>([])
-  const [userName, setUserName] = useState<string>("")
+  const [particles2, setParticles2] = useState<ParticleElement[]>([])
+  const [pluralParticles, setPluralParticles] = useState<ParticleElement[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const { isPlaying, playRandomSong } = useRef(useAudioPlayer()).current
-
+  const { isPlaying, playRandomSong, shufflePlaylist } = useAudioPlayer()
   const hasAttemptedInitialPlay = useRef(false)
+  const hasFetchedPlaylist = useRef(false)
 
   useEffect(() => {
-    if (!isPlaying && !hasAttemptedInitialPlay.current) {
-      playRandomSong()
-      hasAttemptedInitialPlay.current = true
-    }
-  }, [isPlaying, playRandomSong])
+    const fetchInitialBalance = async () => {
+      try {
+        const response = await api.get('/api/sorteio/instantaneos/nao-utilizados');
+        setSaldoParaJogar(response.data.quantidade || 0);
+      } catch (error) {
+        console.error('Erro ao buscar saldo inicial:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInitialBalance();
+  }, [])
 
   useEffect(() => {
-    setParticles2(Array.from({ length: 15 }).map((_, i) => (
+    if (hasFetchedPlaylist.current) return;
+    hasFetchedPlaylist.current = true;
+
+    (async () => {
+      try {
+        const response = await api.get<MusicaResponse>("/api/musica");
+        if (response.data?.data) {
+          const musicas = response.data.data;
+          shufflePlaylist(musicas);
+          
+          // Só toca uma música nova se não estiver tocando nenhuma
+          if (!isPlaying) {
+            playRandomSong();
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar playlist:", err);
+        if (err && typeof err === 'object' && 'response' in err && (err.response as any)?.status === 401) {
+          router.replace('/login?from=/home');
+        }
+      }
+    })();
+  }, [isPlaying, shufflePlaylist, playRandomSong, router]); // Adicionando todas as dependências necessárias
+
+  useEffect(() => {
+    const particles = Array.from({ length: 15 }).map((_, i) => ({
+      key: `p2-${i}`,
+      element: (
       <motion.div
         key={`p2-${i}`}
         className="absolute rounded-full"
@@ -66,9 +110,12 @@ export default function HomePage() {
           delay: Math.random() * 1.5,
         }}
       />
-    )))
+      )
+    }))
 
-    setPluralParticles(Array.from({ length: 10 }).map((_, i) => (
+    const pluralParticles = Array.from({ length: 10 }).map((_, i) => ({
+      key: `pp-${i}`,
+      element: (
       <motion.div
         key={`pp-${i}`}
         className="absolute rounded-full"
@@ -93,25 +140,12 @@ export default function HomePage() {
           delay: Math.random() * 1,
         }}
       />
-    )))
-  }, [])
+      )
+    }))
 
-  useEffect(() => {
-    // Buscar o primeiro nome do usuário
-    const fetchUserName = async () => {
-      try {
-        const response = await api.get('/api/profile/first-name');
-        const { firstName } = response.data;
-        if (firstName) {
-          setUserName(firstName);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar nome do usuário:', error);
-      }
-    };
-
-    fetchUserName();
-  }, []);
+    setParticles2(particles)
+    setPluralParticles(pluralParticles)
+  }, []) // Executa apenas uma vez na montagem
 
   const winners: Winner[] = [
     { id: 1, name: "Carlos S.", prize: "R$ 20.000", video: "https://wrivivjqxeulafrgdrsf.supabase.co/storage/v1/object/public/foto//new_Realiza!-4.mp4" },
@@ -130,10 +164,11 @@ export default function HomePage() {
 
   const handleDepositSuccess = (data: { 
     numerosCapitalizadora: string[], 
-    numerosPremiosInstantaneos: string[] 
+    numerosPremiosInstantaneos: string[],
+    quantidade: number
   }) => {
-    // Atualiza o saldo com a quantidade de números comprados
-    setSaldoParaJogar((prevSaldo) => prevSaldo + data.numerosCapitalizadora.length)
+    // Atualiza o saldo com a quantidade correta de números comprados
+    setSaldoParaJogar((prevSaldo) => prevSaldo + data.quantidade)
     
     // TODO: Implementar lógica para mostrar os números comprados
     console.log('Números da Capitalização:', data.numerosCapitalizadora)
@@ -152,8 +187,12 @@ export default function HomePage() {
     setSaldoSacavel((prev) => prev - amount)
   }
 
-  // Create a motion-enabled Button component
-  //const MotionButton = motion(Button)
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#9ffe00]"></div>
+      <p className="ml-4 text-white">Carregando...</p>
+    </div>
+  }
 
   return (
     <AuthenticatedLayout>
@@ -172,7 +211,7 @@ export default function HomePage() {
         {/* Segundo Vídeo Banner */}
         <div className="relative rounded-lg md:rounded-xl overflow-hidden mb-6 md:mb-8">
           {/* Animações de Partículas Douradas */}
-          {particles2}
+          {particles2.map(particle => particle.element)}
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -236,7 +275,6 @@ export default function HomePage() {
                   <WinnerAvatar
                     key={winner.id}
                     winner={winner}
-                    onClick={() => console.log("Winner clicked:", winner.name)}
                   />
                 ))}
               </div>
@@ -249,7 +287,7 @@ export default function HomePage() {
           style={{ boxShadow: "0 0 20px rgba(30, 59, 58, 0.3)" }}
         >
           {/* Partículas Verdes */}
-          {pluralParticles}
+          {pluralParticles.map(particle => particle.element)}
 
           <h2 className="text-white text-base md:text-lg font-bold mb-4 text-center relative z-10">
             Filantropia Premiável
@@ -332,3 +370,4 @@ export default function HomePage() {
     </AuthenticatedLayout>
   )
 }
+

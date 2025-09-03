@@ -4,16 +4,23 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion } from "framer-motion"
+import Cookies from 'js-cookie'
 
 export default function LogoutPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      router.push("/") // Redirecionar para a página raiz
-    }, 8000) // 8 segundos
+    // Limpa todos os cookies e localStorage
+    Cookies.remove('access_token')
+    Cookies.remove('admin_token')
+    localStorage.clear()
 
-    return () => clearTimeout(timer) // Limpa o timer se o componente for desmontado
+    const timer = setTimeout(() => {
+      router.push("/")
+      router.refresh() // Força um refresh completo da aplicação
+    }, 8000)
+
+    return () => clearTimeout(timer)
   }, [router])
 
   return (
@@ -30,9 +37,9 @@ export default function LogoutPage() {
             scale: 1,
             filter: "brightness(1)",
             boxShadow: [
-              "0 0 0px rgba(0,0,0,0)", // Sem sombra inicial
-              "0 0 20px rgba(0,255,0,0.7)", // Brilho verde neon
-              "0 0 0px rgba(0,0,0,0)", // Volta para sem sombra
+              "0 0 0px rgba(0,0,0,0)",
+              "0 0 20px rgba(0,255,0,0.7)",
+              "0 0 0px rgba(0,0,0,0)",
             ],
           }}
           transition={{
@@ -40,10 +47,10 @@ export default function LogoutPage() {
             scale: { duration: 1 },
             filter: { duration: 1 },
             boxShadow: {
-              duration: 2, // Duração da animação da sombra
-              repeat: Number.POSITIVE_INFINITY, // Repete infinitamente
-              ease: "easeInOut", // Suaviza a transição
-              times: [0, 0.5, 1], // Pontos de controle para a animação da sombra
+              duration: 2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+              times: [0, 0.5, 1],
             },
           }}
           className="relative w-full max-w-md aspect-square flex items-center justify-center"

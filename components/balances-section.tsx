@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { useSpring, animated } from "@react-spring/web"
 import WithdrawModal from "./withdraw-modal"
+import { obterChancesInstantaneasNaoUtilizadas } from "@/lib/sorteio-service"
+import { useCarteiraPremios } from "@/hooks/use-carteira-premios"
 
 // Helper para formatar valores como moeda BRL
 const formatCurrency = (value: number) => {
@@ -19,20 +21,20 @@ const formatCurrency = (value: number) => {
 
 interface BalancesSectionProps {
   saldoParaJogar: number
-  saldoSacavel: number
   onOpenDepositModal: () => void
   onOpenTransferModal: () => void
-  onWithdrawSuccess: (amount: number) => void // Adicionado: Callback para sucesso do saque
+  onWithdrawSuccess: (amount: number) => void // Callback para sucesso do saque
 }
 
 export default function BalancesSection({
-  saldoParaJogar,
-  saldoSacavel,
+  saldoParaJogar: initialSaldoParaJogar,
   onOpenDepositModal,
   onOpenTransferModal,
-  onWithdrawSuccess, // Recebido como prop
+  onWithdrawSuccess,
 }: BalancesSectionProps) {
+  const { saldo: saldoSacavel, isLoading: isLoadingSaldo } = useCarteiraPremios()
   const [showWithdrawModal, setShowWithdrawModal] = useState(false)
+  const [saldoParaJogar, setSaldoParaJogar] = useState(initialSaldoParaJogar)
 
   // Animação para saldo_para_jogar
   const animatedSaldoParaJogar = useSpring({
@@ -41,6 +43,25 @@ export default function BalancesSection({
     config: { duration: 500 },
     reset: true,
   })
+
+  // Função para buscar chances instantâneas não utilizadas
+  const fetchChances = async () => {
+    const chances = await obterChancesInstantaneasNaoUtilizadas();
+    setSaldoParaJogar(chances);
+  };
+
+  // Buscar chances instantâneas não utilizadas ao montar o componente
+  useEffect(() => {
+    fetchChances();
+  }, []);
+
+  // Atualizar o saldo quando houver uma compra bem-sucedida
+  useEffect(() => {
+    if (initialSaldoParaJogar !== saldoParaJogar) {
+      setSaldoParaJogar(initialSaldoParaJogar);
+      fetchChances(); // Atualiza as chances após uma mudança no saldo
+    }
+  }, [initialSaldoParaJogar]);
 
   // Animação para saldoSacavel
   const animatedSaldoSacavel = useSpring({
@@ -65,7 +86,10 @@ export default function BalancesSection({
           <Image src="/images/moeda-2.png" alt="Fichas" width={40} height={40} className="mb-2" />
           <p className="text-sm text-gray-300">Chances Instantâneas</p>
           <animated.p className="text-2xl font-bold text-[#9FFF00] mb-3">
-            {animatedSaldoParaJogar.number.to((n) => Math.floor(n).toLocaleString("pt-BR"))}
+            {animatedSaldoParaJogar.number.to((n) => {
+              const value = Math.max(0, Math.floor(n || 0));
+              return value.toLocaleString("pt-BR");
+            })}
           </animated.p>
           <Button
             onClick={onOpenDepositModal}
@@ -75,16 +99,18 @@ export default function BalancesSection({
           </Button>
         </div>
 
-        {/* Botão de Transferência Central */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-transparent border-2 border-[#9FFF00] rounded-full flex items-center justify-center shadow-lg hover:bg-[#9FFF00]/10 transition-colors"
-          onClick={onOpenTransferModal}
-        >
-          <ArrowLeft className="h-5 w-5 text-[#9FFF00]" />
-          <span className="sr-only">Transferir</span>
-        </Button>
+        {/* Botão de Transferência Central - Temporariamente oculto */}
+        {false && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-transparent border-2 border-[#9FFF00] rounded-full flex items-center justify-center shadow-lg hover:bg-[#9FFF00]/10 transition-colors"
+            onClick={onOpenTransferModal}
+          >
+            <ArrowLeft className="h-5 w-5 text-[#9FFF00]" />
+            <span className="sr-only">Transferir</span>
+          </Button>
+        )}
 
         {/* Card Para Sacar */}
         <div className="flex-1 bg-[#1E3B3A]/40 backdrop-blur-md rounded-lg p-3 border border-[#9FFF00]/10 flex flex-col items-center text-center">

@@ -5,26 +5,30 @@ export type MemberType = 'client' | 'influencer';
 export type MemberStatus = 'active' | 'inactive';
 
 export interface NetworkMember {
-  id: string;
-  name: string;
-  username: string;
-  type: MemberType;
-  status: MemberStatus;
-  level: NetworkLevel;
-  totalGenerated: number;
-  registeredAt: string;
-  photoUrl?: string;
-  children?: NetworkMember[];
+  id: string
+  name: string
+  photoUrl?: string
+  type: "client" | "influencer" | "user"
+  accepted_terms?: boolean
+  level: number
+  joinedAt: string
+  totalEarnings: number
+  status?: "ativo" | "bloqueado" | "inativo"
+  indicador_direto?: {
+    id: string
+    nome_indicador: string
+  }
+  children?: NetworkMember[]
 }
 
 export interface LevelStats {
-  level: NetworkLevel;
-  percentage: number;
-  totalMembers: number;
-  activeMembers: number;
-  totalCommissions: number;
-  monthlyCommissions: number;
-  conversionRate: number;
+  level: 1 | 2 | 3
+  percentage: number
+  totalMembers: number
+  activeMembers: number
+  totalCommissions: number
+  monthlyCommissions: number
+  conversionRate: number
 }
 
 export interface NetworkTransaction {
@@ -50,13 +54,13 @@ export interface NetworkMetrics {
 }
 
 export interface MarketingResource {
-  id: string;
-  title: string;
-  description: string;
-  type: 'video' | 'image' | 'document' | 'link';
-  url: string;
-  category: 'social' | 'whatsapp' | 'email' | 'presentation';
-  tags: string[];
+  id: string
+  title: string
+  description: string
+  type: "document" | "image" | "video" | "link"
+  category: "social" | "whatsapp" | "email" | "presentation"
+  url: string
+  tags?: string[]
 }
 
 export interface Achievement {
@@ -81,4 +85,73 @@ export interface InviteLink {
   clicks: number;
   conversions: number;
   createdAt: string;
+}
+
+// Novos tipos para a área administrativa
+export interface NetworkStats {
+  level: number
+  members: number
+  revenue: number
+  commissions: number
+  commissionRate: number
+}
+
+export interface NetworkOverviewData {
+  totalMembers: number
+  totalRevenue: number
+  totalCommissions: number
+  averageCommissionRate: number
+  levelStats: NetworkStats[]
+}
+
+// Removido para evitar conflito com o tipo do PromotionsManager
+
+export interface CommissionLevel {
+  level: number
+  percentage: number
+  description: string
+}
+
+// Tipos para a API de influencers
+export interface InfluencerComissao {
+  nivel: "direto" | "secundario" | "expandido"
+  percentual: number
+}
+
+export interface RedeMembro {
+  id: string
+  nome: string
+  data_cadastro: string
+  volume_depositos: number
+  status: "ativo" | "bloqueado" | "inativo"
+  rede: {
+    diretos: RedeMembro[]
+    secundarios: RedeMembro[]
+    expandidos: RedeMembro[]
+  }
+}
+
+export interface InfluencerRede {
+  diretos: RedeMembro[]
+  secundarios: RedeMembro[]
+  expandidos: RedeMembro[]
+}
+
+export interface Influencer {
+  id: string
+  nome: string
+  codigo_influencer: string
+  status: "ativo" | "bloqueado"
+  comissoes: InfluencerComissao[]
+  rede: InfluencerRede
+}
+
+export interface ApiResponse {
+  data: Influencer[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    total_pages: number
+  }
 } 

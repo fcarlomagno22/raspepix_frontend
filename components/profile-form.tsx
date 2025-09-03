@@ -1,66 +1,37 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect, useTransition } from "react"
+import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { getUserProfile, updateUserProfile, type UserProfile } from "@/app/profile/actions"
-import { maskPhone, maskCEP } from "@/lib/form-utils"
+import { updatePhone } from "@/app/profile/actions"
+import { maskPhone, maskCPF } from "@/lib/form-utils"
 
-interface ProfileFormProps {
-  userId: string // ID do usuário logado
+interface ProfileData {
+  full_name: string
+  cpf: string
+  email: string
+  phone: string
 }
 
-export default function ProfileForm({ userId }: ProfileFormProps) {
+interface ProfileFormProps {
+  initialData: ProfileData
+}
+
+export function ProfileForm({ initialData }: ProfileFormProps) {
   const { toast } = useToast()
-  const [isPending, startTransition] = useTransition()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  // campos editáveis
-  const [name, setName] = useState("")
-  const [phone, setPhone] = useState("")
-  const [address, setAddress] = useState("")
-  const [city, setCity] = useState("")
-  const [state, setState] = useState("")
-  const [zipCode, setZipCode] = useState("")
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true)
-      const userProfile = await getUserProfile(userId)
-
-      if (userProfile) {
-        setProfile(userProfile)
-        setName(userProfile.name)
-        setPhone(userProfile.phone || "")
-        setAddress(userProfile.address || "")
-        setCity(userProfile.city || "")
-        setState(userProfile.state || "")
-        setZipCode(userProfile.zip_code || "")
-      } else {
-        toast({
-          title: "Erro",
-          description: "Falha ao carregar o perfil do usuário.",
-          variant: "destructive",
-        })
-      }
-      setLoading(false)
-    }
-
-    fetchProfile()
-  }, [userId, toast])
+  const [isPending, setIsPending] = useState(false)
+  const [phone, setPhone] = useState(initialData.phone || "")
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    setIsPending(true)
 
-    startTransition(async () => {
-      const formData = new FormData(event.currentTarget)
-      const result = await updateUserProfile(userId, formData)
+    try {
+      const result = await updatePhone(phone)
 
       if (result.success) {
         toast({
@@ -68,18 +39,6 @@ export default function ProfileForm({ userId }: ProfileFormProps) {
           description: result.message,
           variant: "default",
         })
-
-        // obtém novamente o perfil para atualizar a UI
-        const updatedProfile = await getUserProfile(userId)
-        if (updatedProfile) {
-          setProfile(updatedProfile)
-          setName(updatedProfile.name)
-          setPhone(updatedProfile.phone || "")
-          setAddress(updatedProfile.address || "")
-          setCity(updatedProfile.city || "")
-          setState(updatedProfile.state || "")
-          setZipCode(updatedProfile.zip_code || "")
-        }
       } else {
         toast({
           title: "Erro",
@@ -87,15 +46,15 @@ export default function ProfileForm({ userId }: ProfileFormProps) {
           variant: "destructive",
         })
       }
-    })
-  }
-
-  if (loading) {
-    return <div className="flex h-64 items-center justify-center text-gray-400">Carregando perfil...</div>
-  }
-
-  if (!profile) {
-    return <div className="flex h-64 items-center justify-center text-red-400">Não foi possível carregar o perfil.</div>
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o telefone",
+        variant: "destructive",
+      })
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (
@@ -106,7 +65,6 @@ export default function ProfileForm({ userId }: ProfileFormProps) {
 
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-6">
-          {/* linha 1 */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="name" className="text-gray-300">
@@ -115,11 +73,9 @@ export default function ProfileForm({ userId }: ProfileFormProps) {
               <Input
                 id="name"
                 name="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-[#232D3F] border-[#9FFF00]/10 text-white"
-                required
-                disabled={isPending}
+                value={initialData.full_name || ""}
+                className="bg-[#232D3F] border-[#9FFF00]/10 text-gray-400"
+                disabled
               />
             </div>
             <div>
@@ -130,7 +86,7 @@ export default function ProfileForm({ userId }: ProfileFormProps) {
                 id="email"
                 name="email"
                 type="email"
-                value={profile.email}
+                value={initialData.email}
                 className="bg-[#232D3F] border-[#9FFF00]/10 text-gray-400"
                 disabled
               />
@@ -142,7 +98,7 @@ export default function ProfileForm({ userId }: ProfileFormProps) {
               <Input
                 id="document"
                 name="document"
-                value={profile.document ?? ""}
+                value={maskCPF(initialData.cpf || "")}
                 className="bg-[#232D3F] border-[#9FFF00]/10 text-gray-400"
                 disabled
               />
@@ -155,63 +111,7 @@ export default function ProfileForm({ userId }: ProfileFormProps) {
                 id="phone"
                 name="phone"
                 value={maskPhone(phone)}
-                onChange={(e) => setPhone(e.target.value)}
-                className="bg-[#232D3F] border-[#9FFF00]/10 text-white"
-                disabled={isPending}
-              />
-            </div>
-          </div>
-
-          {/* linha 2 */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="address" className="text-gray-300">
-                Endereço
-              </Label>
-              <Input
-                id="address"
-                name="address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="bg-[#232D3F] border-[#9FFF00]/10 text-white"
-                disabled={isPending}
-              />
-            </div>
-            <div>
-              <Label htmlFor="city" className="text-gray-300">
-                Cidade
-              </Label>
-              <Input
-                id="city"
-                name="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="bg-[#232D3F] border-[#9FFF00]/10 text-white"
-                disabled={isPending}
-              />
-            </div>
-            <div>
-              <Label htmlFor="state" className="text-gray-300">
-                Estado
-              </Label>
-              <Input
-                id="state"
-                name="state"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                className="bg-[#232D3F] border-[#9FFF00]/10 text-white"
-                disabled={isPending}
-              />
-            </div>
-            <div>
-              <Label htmlFor="zip_code" className="text-gray-300">
-                CEP
-              </Label>
-              <Input
-                id="zip_code"
-                name="zip_code"
-                value={maskCEP(zipCode)}
-                onChange={(e) => setZipCode(e.target.value)}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
                 className="bg-[#232D3F] border-[#9FFF00]/10 text-white"
                 disabled={isPending}
               />

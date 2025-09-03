@@ -10,7 +10,7 @@ export default function FooterSection() {
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-8">
         {/* Logo e Redes Sociais */}
         <div className="flex flex-col items-center md:items-start">
-          <Image src="/images/00 - Logo RaspePix.png" alt="RaspePix Logo" width={150} height={50} className="mb-4" />
+          <img src="/images/00 - Logo RaspePix.png" alt="RaspePix Logo" width={150} height={50} className="mb-4" style={{ objectFit: 'contain' }} />
           <div className="flex space-x-4">
             <Link href="#" className="text-gray-400 hover:text-pink-500 transition-colors">
               <Instagram className="h-6 w-6" />

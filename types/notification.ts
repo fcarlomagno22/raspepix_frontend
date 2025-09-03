@@ -4,6 +4,7 @@ export interface User {
   id: string
   name: string
   cpf: string
+  email: string
 }
 
 export interface Notification {
@@ -54,4 +55,13 @@ export interface RespostaSorteio {
   premiado: boolean
   utilizado: boolean
   usado_em: string | null
+}
+
+export interface NumeroCapitalizadora {
+  numero: string;
+  utilizado: boolean;
+  comprador_nome?: string;
+  comprador_cpf?: string;
+  status_pagamento?: string;
+  uuid: string;
 }

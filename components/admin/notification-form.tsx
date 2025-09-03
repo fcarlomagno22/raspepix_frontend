@@ -12,9 +12,9 @@ import { Switch } from "@/components/ui/switch"
 import { Users, UserPlus, User, X } from "lucide-react"
 import type { Notification, NotificationTargetType, User as AppUser } from "@/types/notification"
 import UserSelectionModal from "./user-selection-modal"
-import { getUsersByCpf } from "@/lib/users"
-import { validateNotification } from "@/lib/notification"
-import { createNotification, updateNotification, getUsers } from "@/services/api"
+import { getAdminUsers } from "@/services/api"
+import { validateNotification, createNotification, updateNotification, updateNotificationStatus } from "@/lib/notification"
+import { useDebounce } from "@/hooks/use-debounce"
 
 interface NotificationFormProps {
   isOpen: boolean
@@ -43,36 +43,47 @@ export default function NotificationForm({
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [allUsers, setAllUsers] = useState<AppUser[]>([])
+
+  const debouncedCpfSearch = useDebounce(cpfSearch, 300)
 
   useEffect(() => {
-    if ((targetType === "selected" || targetType === "single") && availableUsers.length === 0) {
+    if ((targetType === "selected" || targetType === "single") && allUsers.length === 0) {
       loadUsers();
     }
   }, [targetType]);
 
   const loadUsers = async () => {
     try {
-      const response = await getUsers();
-      console.log('Resposta completa:', response); // Debug
-      const formattedUsers = response.users.map(user => {
-        if (!user.uuid) {
-          console.error('User without uuid:', user);
-          return null;
-        }
-        return {
-          id: user.uuid,
-          name: user.full_name,
-        cpf: user.cpf
-        };
-      }).filter(Boolean); // Remove any null entries
+      const response = await getAdminUsers();
+      const formattedUsers = response.data.map(user => ({
+        id: user.cpf, // Usando CPF como ID já que não temos UUID na resposta
+        name: user.full_name,
+        cpf: user.cpf,
+        email: user.email
+      }));
       
-      console.log('Formatted users:', formattedUsers); // Debug
+      setAllUsers(formattedUsers);
       setAvailableUsers(formattedUsers);
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);
       setError('Não foi possível carregar a lista de usuários');
     }
   };
+
+  useEffect(() => {
+    if (debouncedCpfSearch) {
+      const filteredUsers = allUsers.filter(user => 
+        user.cpf.replace(/\D/g, '').includes(debouncedCpfSearch.replace(/\D/g, '')) ||
+        user.name.toLowerCase().includes(debouncedCpfSearch.toLowerCase())
+      );
+      setAvailableUsers(filteredUsers);
+      setCpfSearchError(filteredUsers.length === 0 ? "Nenhum usuário encontrado." : null);
+    } else {
+      setAvailableUsers(allUsers);
+      setCpfSearchError(null);
+    }
+  }, [debouncedCpfSearch, allUsers]);
 
   const handleSelectUser = (user: AppUser) => {
     if (targetType === "single") {
@@ -117,13 +128,22 @@ export default function NotificationForm({
     }
     setCpfSearchError(null)
     try {
-      const user = await getUsersByCpf(cpfSearch)
+      const response = await getAdminUsers();
+      const user = response.data.find(u => u.cpf === cpfSearch);
+      
       if (user) {
+        const formattedUser = {
+          id: user.cpf,
+          name: user.full_name,
+          cpf: user.cpf,
+          email: user.email
+        };
+        
         if (targetType === "single") {
-          setSelectedUsers([user])
+          setSelectedUsers([formattedUser])
         } else if (targetType === "selected") {
-          if (!selectedUsers.some((u) => u.id === user.id)) {
-            setSelectedUsers((prev) => [...prev, user])
+          if (!selectedUsers.some((u) => u.id === formattedUser.id)) {
+            setSelectedUsers((prev) => [...prev, formattedUser])
           }
         }
         setCpfSearch("")
@@ -179,15 +199,32 @@ export default function NotificationForm({
     }
   }
 
+  const handleStatusChange = async (checked: boolean) => {
+    if (initialData?.id) {
+      try {
+        await updateNotificationStatus(initialData.id, checked);
+        setIsNotificationActive(checked);
+        onUpdate?.(); // Chama a função para atualizar a lista
+      } catch (error) {
+        console.error('Erro ao atualizar status:', error);
+        // Reverte o estado em caso de erro
+        setIsNotificationActive(!checked);
+      }
+    } else {
+      setIsNotificationActive(checked);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#1A2430] text-white border-[#9FFF00]/10 max-w-[90%] w-[800px] max-h-[90vh] flex flex-col">
+      <DialogContent className="bg-[#191F26] border-[#9FFF00]/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-white">
+          <DialogTitle className="text-[#9FFF00]">
             {initialData ? "Editar Notificação" : "Nova Notificação"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-6 mt-6 pr-2">
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-md text-sm">{error}</div>
           )}
@@ -266,29 +303,19 @@ export default function NotificationForm({
           </div>
 
           {(targetType === "selected" || targetType === "single") && (
-            <div className="space-y-4 border border-[#9FFF00]/10 p-4 rounded-md">
-              <h4 className="font-semibold text-white">Seleção de Usuários</h4>
-              <div className="flex gap-2 items-end">
-                <div className="grid gap-2 flex-1">
-                  <Label htmlFor="cpfSearch" className="text-white">
-                    Buscar por CPF
-                  </Label>
-                  <Input
-                    id="cpfSearch"
-                    placeholder="Digite o CPF"
-                    value={cpfSearch}
-                    onChange={(e) => setCpfSearch(e.target.value)}
-                    className="bg-[#232D3F] border-[#9FFF00]/10 focus:border-[#9FFF00]/30 text-white h-9 w-40"
-                  />
-                  {cpfSearchError && <p className="text-red-400 text-xs">{cpfSearchError}</p>}
-                </div>
-                <Button
-                  type="button"
-                  onClick={handleCpfSearch}
-                  className="bg-[#9FFF00] hover:bg-[#9FFF00]/90 text-[#191F26] border-[#9FFF00]"
-                >
-                  Buscar CPF
-                </Button>
+            <div className="space-y-4">
+              <div className="flex flex-col space-y-2">
+                <Label htmlFor="cpf_search">Buscar por CPF ou Nome</Label>
+                <Input
+                  id="cpf_search"
+                  value={cpfSearch}
+                  onChange={(e) => setCpfSearch(e.target.value)}
+                  placeholder="Digite o CPF ou nome do usuário"
+                  className="bg-[#232D3F] border-[#9FFF00]/10 focus:border-[#9FFF00]/30 text-white"
+                />
+                {cpfSearchError && (
+                  <p className="text-red-400 text-sm">{cpfSearchError}</p>
+                )}
               </div>
 
               <div className="bg-[#232D3F] border border-[#9FFF00]/10 rounded-md p-3 min-h-[100px] max-h-[200px] overflow-y-auto">
@@ -296,10 +323,10 @@ export default function NotificationForm({
                   <p className="text-center text-red-400 py-4">{error}</p>
                 )}
                 {!error && availableUsers.length === 0 ? (
-                  <p className="text-center text-gray-400 py-4">Carregando usuários...</p>
+                  <p className="text-center text-gray-400 py-4">Nenhum usuário encontrado</p>
                 ) : (
                   <div className="space-y-2">
-                    {availableUsers.slice(0, 25).map((user) => (
+                    {availableUsers.map((user) => (
                       <div
                         key={user.id}
                         onClick={() => handleSelectUser(user)}
@@ -329,7 +356,7 @@ export default function NotificationForm({
             <Switch
               id="is_active"
               checked={isNotificationActive}
-              onCheckedChange={setIsNotificationActive}
+              onCheckedChange={handleStatusChange}
               className="data-[state=checked]:bg-[#9FFF00] data-[state=checked]:text-[#191F26]"
             />
             <Label htmlFor="is_active" className="text-white">

@@ -1,7 +1,18 @@
+"use client"
+
 import { useQuery } from "@tanstack/react-query"
 import { LevelStats, NetworkMember, MarketingResource } from "@/types/network"
 
-// TODO: Substituir por chamadas reais à API
+interface NetworkTransaction {
+  data: string
+  cliente: string
+  valor_deposito: number
+  valor_comissao: number
+  tipo_indicacao: string
+}
+import { api } from "@/services/api"
+import { useInfluencerStatus } from "@/hooks/use-influencer-status"
+
 const fetchNetworkStats = async (): Promise<LevelStats[]> => {
   // Simula uma chamada à API
   return new Promise((resolve) => {
@@ -39,63 +50,68 @@ const fetchNetworkStats = async (): Promise<LevelStats[]> => {
   })
 }
 
-// Função auxiliar para gerar membros aleatórios
-const generateRandomMembers = (count: number, level: number): NetworkMember[] => {
-  const names = [
-    "João", "Maria", "Pedro", "Ana", "Lucas", "Julia", "Carlos", "Sofia", "Miguel", 
-    "Isabella", "Arthur", "Laura", "Davi", "Valentina", "Bernardo", "Helena", "Gabriel",
-    "Alice", "Heitor", "Luiza", "Theo", "Isis", "Lorenzo", "Manuela", "Rafael", "Lívia",
-    "Nicolas", "Heloísa", "Daniel", "Sarah"
-  ]
-  const surnames = [
-    "Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Alves", "Lima",
-    "Pereira", "Costa", "Carvalho", "Gomes", "Martins", "Araújo", "Melo", "Barbosa",
-    "Cardoso", "Ribeiro", "Mendes", "Pinto", "Reis", "Monteiro", "Sales", "Campos",
-    "Cunha", "Moura", "Rocha", "Dias", "Nunes", "Castro"
-  ]
-
-  return Array.from({ length: count }, (_, i) => {
-    const firstName = names[Math.floor(Math.random() * names.length)]
-    const lastName = surnames[Math.floor(Math.random() * surnames.length)]
-    const fullName = `${firstName} ${lastName}`
-    const username = `${firstName.toLowerCase()}${lastName.toLowerCase()}`
-    const isInfluencer = Math.random() > 0.7
-    const isActive = Math.random() > 0.2
-    const totalGenerated = Math.floor(Math.random() * 10000) + 1000
-
-    const member: NetworkMember = {
-      id: `user-l${level}-${i + 1}`,
-      name: fullName,
-      username,
-      type: isInfluencer ? "influencer" : "client",
-      status: isActive ? "active" : "inactive",
-      level,
-      totalGenerated,
-      registeredAt: new Date(Date.now() - Math.floor(Math.random() * 10000000000)).toISOString(),
-      children: level < 3 ? generateRandomMembers(Math.floor(Math.random() * 5) + 4, level + 1) : undefined
-    }
-
-    return member
-  })
-}
+const mapApiMemberToNetworkMember = (apiMember: any, level: number = 1): NetworkMember => {
+  console.log('Mapeando membro:', apiMember.nome, {
+    tipo: apiMember.tipo,
+    termos_aceitos: apiMember.termos_aceitos,
+    total_vendas: apiMember.total_vendas_geradas
+  });
+  
+  const member: NetworkMember = {
+    id: apiMember.id,
+    name: apiMember.nome,
+    type: apiMember.nivel === "direto" ? "influencer" : "user",
+    accepted_terms: true, // Se tem nivel "direto", assumimos que é influencer e aceitou os termos
+    level: level,
+    joinedAt: apiMember.data_cadastro,
+    totalEarnings: apiMember.total_vendas_geradas || 0,
+    indicador_direto: apiMember.indicador_direto,
+    children: apiMember.indicados?.map((indicado: any) => 
+      mapApiMemberToNetworkMember(indicado, level + 1)
+    ) || []
+  };
+  return member;
+};
 
 const fetchNetworkTree = async (): Promise<NetworkMember> => {
-  // Simula uma chamada à API
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: "user-root",
-        name: "Seu Nome",
-        username: "seunome",
-        type: "influencer",
-        status: "active",
-        level: 1,
-        totalGenerated: 55000.0,
-        registeredAt: "2024-01-01T00:00:00Z",
-        children: generateRandomMembers(20, 2) // 20 indicados diretos
-      })
-    }, 1000)
-  })
+  try {
+    const response = await api.get('/api/influencers/rede/arvore-completa');
+    const data = response.data;
+    
+    console.log('Dados brutos da API:', data);
+    console.log('Primeiro membro:', data[0]);
+    
+    if (!data || !Array.isArray(data)) {
+      throw new Error('Dados da rede inválidos');
+    }
+
+    // Criar o nó raiz (usuário logado) e adicionar os indicados diretos como filhos
+    const rootMember: NetworkMember = {
+      id: data[0]?.indicador_direto?.id || 'root',
+      name: data[0]?.indicador_direto?.nome_indicador || 'Você',
+      type: "influencer",
+      accepted_terms: true, // O usuário logado já é influencer
+      level: 0,
+      joinedAt: new Date().toISOString(),
+      totalEarnings: 0,
+      children: data.map(member => mapApiMemberToNetworkMember(member))
+    };
+
+    return rootMember;
+  } catch (error) {
+    console.error('Erro ao buscar árvore da rede:', error);
+    throw new Error('Falha ao buscar dados da rede');
+  }
+}
+
+const fetchNetworkTransactions = async (): Promise<NetworkTransaction[]> => {
+  try {
+    const response = await api.get('/api/influencers/rede/depositos')
+    return response.data
+  } catch (error) {
+    console.error('Erro ao buscar transações da rede:', error)
+    throw new Error('Falha ao buscar transações da rede')
+  }
 }
 
 const fetchMarketingResources = async (): Promise<MarketingResource[]> => {
@@ -162,6 +178,8 @@ const fetchMarketingResources = async (): Promise<MarketingResource[]> => {
 }
 
 export function useNetwork() {
+  const { isInfluencer } = useInfluencerStatus()
+
   const {
     data: networkStats,
     isLoading: isLoadingStats,
@@ -169,6 +187,7 @@ export function useNetwork() {
   } = useQuery({
     queryKey: ["networkStats"],
     queryFn: fetchNetworkStats,
+    enabled: isInfluencer,
   })
 
   const {
@@ -178,6 +197,7 @@ export function useNetwork() {
   } = useQuery({
     queryKey: ["networkTree"],
     queryFn: fetchNetworkTree,
+    enabled: isInfluencer,
   })
 
   const {
@@ -187,13 +207,25 @@ export function useNetwork() {
   } = useQuery({
     queryKey: ["marketingResources"],
     queryFn: fetchMarketingResources,
+    enabled: isInfluencer,
+  })
+
+  const {
+    data: networkTransactions,
+    isLoading: isLoadingTransactions,
+    error: transactionsError,
+  } = useQuery({
+    queryKey: ["networkTransactions"],
+    queryFn: fetchNetworkTransactions,
+    enabled: isInfluencer,
   })
 
   return {
     networkStats,
     networkTree,
     marketingResources,
-    isLoading: isLoadingStats || isLoadingTree || isLoadingResources,
-    error: statsError || treeError || resourcesError,
+    networkTransactions,
+    isLoading: isLoadingStats || isLoadingTree || isLoadingResources || isLoadingTransactions,
+    error: statsError || treeError || resourcesError || transactionsError,
   }
-} 
+}

@@ -1,8 +1,5 @@
-import { api } from "./api"
-import type { EdicaoSorteio, BilheteInstantaneo, RespostaSorteio } from "@/types/notification"
-import axios from "axios";
+import { api } from './api';
 
-// Interface original para manter compatibilidade
 export interface SorteioEdicao {
   id: string;
   nome: string;
@@ -13,101 +10,242 @@ export interface SorteioEdicao {
   status: string;
   criado_em: string;
   atualizado_em: string;
-  configuracoes_premios: {
-    valor_maximo: number;
-    valor_minimo: number;
-    total_titulos: number;
-    quantidade_premios: number;
-  };
+  configuracoes_premios: any;
 }
 
-interface SorteioError extends Error {
-  type?: 'warning' | 'error';
+export interface Bilhete {
+  id: string;
+  numero: string;
+  status: string;
+  data_compra: string;
 }
 
-// Restaurando o serviço original para manter compatibilidade
-export const sorteioService = {
-  async listarEdicoes(): Promise<SorteioEdicao[]> {
+export interface TituloEdicao {
+  numero: string;
+  status: string;
+  comprador_nome: string;
+  comprador_cpf: string;
+  status_pagamento: string;
+  tipo_premio: string;
+  valor_premio: number;
+}
+
+export interface ListagemTitulosResponse {
+  titulos: TituloEdicao[];
+  total: number;
+  total_premiados: number;
+  total_vendidos: number;
+}
+
+export interface ListagemTitulosParams {
+  page: number;
+  per_page: number;
+  search?: string;
+  status?: string;
+}
+
+export interface NumeroCapitalizadora {
+  id: string;
+  uuid: string;
+  numero: string;
+  premiado: boolean;
+  descricao_premio: string;
+  utilizado: boolean;
+  criado_em: string;
+  atualizado_em: string;
+  comprador_id: string | null;
+  comprado_em: string | null;
+  status_pagamento: string | null;
+  edicao_sorteio_id: string;
+  comprador_nome: string | null;
+  comprador_cpf: string | null;
+}
+
+export interface ListagemNumerosResponse {
+  data: NumeroCapitalizadora[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export const getEdicoes = async (): Promise<SorteioEdicao[]> => {
+  try {
     const response = await api.get('/api/sorteio/edicoes');
     return response.data;
-  },
-
-  async excluirEdicao(id: string): Promise<{ message: string }> {
-    try {
-      const response = await api.delete(`/api/sorteio/edicoes/${id}`);
-      return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
-        const customError = new Error('Não é possível deletar sorteios em andamento com números vendidos.') as SorteioError;
-        customError.type = 'warning';
-        throw customError;
-      }
-      throw new Error('Erro ao excluir sorteio. Por favor, tente novamente.');
-    }
-  }
-};
-
-// Novas funções mantidas
-const validarBilhete = (bilhete: BilheteInstantaneo, totalTitulos: number) => {
-  // Validar se número está dentro do range
-  const numero = parseInt(bilhete.numero_titulo);
-  if (numero < 1 || numero > totalTitulos) {
-    throw new Error(`Número ${bilhete.numero_titulo} fora do range válido (1 a ${totalTitulos})`);
-  }
-
-  // Validar se bilhete premiado tem valor
-  if (bilhete.premiado && !bilhete.valor_premio) {
-    throw new Error(`Bilhete premiado ${bilhete.numero_titulo} deve ter um valor de prêmio`);
-  }
-
-  // Validar formato do número (zeros à esquerda)
-  const numeroDigitos = totalTitulos.toString().length;
-  if (bilhete.numero_titulo.length !== numeroDigitos) {
-    throw new Error(`Número ${bilhete.numero_titulo} deve ter ${numeroDigitos} dígitos`);
-  }
-};
-
-export const criarEdicao = async (edicao: EdicaoSorteio): Promise<EdicaoSorteio> => {
-  try {
-    // Validar todos os bilhetes antes de enviar
-    edicao.bilhetesInstantaneos.forEach(bilhete => {
-      validarBilhete(bilhete, edicao.configPremiosInstantaneos.total_titulos);
-    });
-
-    const response = await api.post('/api/sorteio/edicoes', edicao);
-    return response.data;
   } catch (error) {
-    console.error('Erro ao criar edição:', error);
-    throw new Error('Não foi possível criar a edição do sorteio. Por favor, verifique os dados e tente novamente.');
+    console.error('Erro ao buscar edições:', error);
+    throw new Error('Não foi possível carregar as edições do sorteio');
   }
-}
+};
 
-export const listarBilhetes = async (edicaoId: string): Promise<BilheteInstantaneo[]> => {
+export const getBilhetes = async (edicaoId: string): Promise<Bilhete[]> => {
   try {
     const response = await api.get(`/api/sorteio/bilhetes?edicao=${edicaoId}`);
     return response.data;
   } catch (error) {
-    console.error('Erro ao listar bilhetes:', error);
-    throw new Error('Não foi possível carregar os bilhetes. Por favor, tente novamente.');
+    console.error('Erro ao buscar bilhetes:', error);
+    throw new Error('Não foi possível carregar os bilhetes');
   }
-}
+};
 
-export const sortearBilhete = async (): Promise<RespostaSorteio> => {
+export const sortearInstantaneo = async () => {
   try {
-    const response = await api.post('/api/sorteio/instantaneo/sortear');
+    const response = await api.post('/api/sorteio/instantaneo');
     return response.data;
   } catch (error) {
-    console.error('Erro ao sortear bilhete:', error);
-    throw new Error('Não foi possível realizar o sorteio. Por favor, tente novamente.');
+    console.error('Erro ao realizar sorteio:', error);
+    throw new Error('Não foi possível realizar o sorteio');
   }
-}
+};
 
-export const usarBilhete = async (numeroTitulo: string): Promise<BilheteInstantaneo> => {
+export const usarBilhete = async (numeroTitulo: string) => {
   try {
     const response = await api.post(`/api/sorteio/bilhetes/${numeroTitulo}/usar`);
     return response.data;
   } catch (error) {
     console.error('Erro ao usar bilhete:', error);
-    throw new Error('Não foi possível utilizar o bilhete. Por favor, tente novamente.');
+    throw new Error('Não foi possível usar o bilhete');
+  }
+};
+
+export const atualizarStatusEdicao = async (id: string, status: string): Promise<{ status: string }> => {
+  try {
+    const response = await api.patch(`/api/sorteio/admin/edicoes/${id}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao atualizar status da edição:', error);
+    throw new Error('Não foi possível atualizar o status da edição');
+  }
+};
+
+export const excluirEdicao = async (id: string): Promise<void> => {
+  try {
+    await api.delete(`/api/sorteio/admin/edicoes/${id}`);
+  } catch (error: any) {
+    console.error('Erro ao excluir edição:', error);
+    
+    // Tratamento específico para erro de autenticação
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('admin_token');
+        window.location.href = '/admin/login';
+      }
+      throw new Error('Sessão expirada. Por favor, faça login novamente.');
+    }
+
+    // Erro 404 - Edição não encontrada
+    if (error.response?.status === 404) {
+      throw new Error('Edição não encontrada');
+    }
+
+    throw new Error('Não foi possível excluir a edição');
+  }
+};
+
+export const listarTitulosEdicao = async (
+  edicaoId: string,
+  params: ListagemTitulosParams
+): Promise<ListagemTitulosResponse> => {
+  try {
+    const queryParams = new URLSearchParams({
+      page: params.page.toString(),
+      limit: params.per_page.toString(),
+      ...(params.search && { search: params.search }),
+      ...(params.status && { status: params.status })
+    });
+
+    const response = await api.get(`/api/sorteio/edicoes/${edicaoId}/titulos?${queryParams}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Erro ao listar títulos da edição:', error);
+    
+    // Tratamento específico para erro de autenticação
+    if (error.response?.status === 401) {
+      // Remove o token e redireciona para login
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('admin_token');
+        window.location.href = '/admin/login';
+      }
+      throw new Error('Sessão expirada. Por favor, faça login novamente.');
+    }
+
+    // Erro 404 - Edição não encontrada
+    if (error.response?.status === 404) {
+      throw new Error('Edição não encontrada');
+    }
+
+    // Outros erros
+    throw new Error('Não foi possível carregar os títulos da edição');
+  }
+}; 
+
+export const listarNumerosCapitalizadora = async (
+  edicaoId: string,
+  page: number = 1,
+  per_page: number = 25,
+  search?: string,
+  status_pagamento?: string
+): Promise<ListagemNumerosResponse> => {
+  try {
+    const params = new URLSearchParams();
+    
+    // Parâmetros obrigatórios
+    params.append('edicao_id', edicaoId);
+    params.append('page', page.toString());
+    params.append('per_page', per_page.toString());
+    
+    // Parâmetros opcionais
+    if (search && search.trim() !== '') {
+      params.append('search', search.trim());
+    }
+    
+    if (status_pagamento && status_pagamento !== 'todos') {
+      params.append('status_pagamento', status_pagamento.toUpperCase());
+    }
+
+    console.log('URL da requisição:', `/api/sorteio/numeros-capitalizadora?${params.toString()}`);
+    const response = await api.get(`/api/sorteio/numeros-capitalizadora?${params.toString()}`);
+    console.log('Resposta da API:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Erro ao listar números da capitalizadora:', error);
+    
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('admin_token');
+        window.location.href = '/admin/login';
+      }
+      throw new Error('Sessão expirada. Por favor, faça login novamente.');
+    }
+
+    throw new Error('Não foi possível carregar os números da capitalizadora');
+  }
+}; 
+
+export async function buscarTotalTitulosPagos(sorteioId: string): Promise<number> {
+  try {
+    const response = await api.get(`/api/admin/sorteios/${sorteioId}/titulos-pagos/total`);
+
+    return response.data.total;
+  } catch (error) {
+    console.error('Erro ao buscar total de títulos pagos:', error);
+    throw new Error('Erro ao buscar total de títulos pagos');
+  }
+} 
+
+export async function buscarTotalTitulosPendentes(edicaoId: string): Promise<number> {
+  const response = await api.get(`/api/admin/sorteios/${edicaoId}/titulos-pendentes/total`);
+  return response.data.total;
+} 
+
+export async function atualizarStatusPagamentoTitulo(tituloId: string, novoStatus: 'PAGO' | 'PENDENTE') {
+  try {
+    const response = await api.patch(`/api/sorteio/titulos/${tituloId}/pagamento`, {
+      status_pagamento: novoStatus.toLowerCase()
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
   }
 } 

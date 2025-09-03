@@ -3,6 +3,7 @@
 import { cookies } from "next/headers"
 import { formatCPF, maskPhone } from "@/lib/form-utils"
 import { z } from "zod"
+import { API_CONFIG } from "@/config/api"
 
 export interface ProfileData {
   full_name: string
@@ -44,25 +45,33 @@ const phoneSchema = z
  */
 export async function getUserProfile(): Promise<UserProfile | null> {
   try {
-    const accessToken = cookies().get('access_token')?.value
+    const cookieStore = cookies()
+    const accessToken = await cookieStore.get('access_token')?.value
     if (!accessToken) {
       throw new Error("Sessão expirada, faça login novamente")
     }
 
-    const response = await fetch("https://raspepixbackend-production.up.railway.app/api/profile/me", {
+    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USER.PROFILE}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
+      credentials: 'include', // Importante para enviar cookies
     })
 
     if (!response.ok) {
       if (response.status === 401) {
         throw new Error("Sessão expirada, faça login novamente")
       }
+      
+      const errorData = await response.json().catch(() => ({}))
+      
       if (response.status === 404) {
-        throw new Error("Perfil não encontrado")
+        throw new Error(errorData.message || "Perfil não encontrado")
       }
-      throw new Error("Erro ao carregar dados do perfil")
+      
+      throw new Error(errorData.message || "Erro ao carregar dados do perfil")
     }
 
     const data: ProfileData = await response.json()
@@ -115,12 +124,14 @@ export async function updatePhone(phone: string): Promise<UpdatePhoneResponse> {
       throw new Error("Sessão expirada, faça login novamente")
     }
 
-    const response = await fetch("https://raspepixbackend-production.up.railway.app/api/profile/me/phone", {
-      method: "PATCH",
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/profile/me/phone`, {
+      method: "PUT", // Mudando para PUT ao invés de PATCH
       headers: {
         "Content-Type": "application/json",
+        "Accept": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
+      credentials: 'include', // Importante para enviar cookies
       body: JSON.stringify({ phone: validatedPhone }),
     })
 

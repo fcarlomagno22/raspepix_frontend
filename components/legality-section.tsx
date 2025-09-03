@@ -46,7 +46,7 @@ export default function LegalitySection() {
     {
       icon: CheckCircle,
       title: "Pagamento Garantido",
-      description: "Se você ganhar, a gente PAGA! Não é promessa de político, é lei mesmo! 💰⚖️",
+      description: "Se você ganhar, a gente PAGA! Não é promessa de político, é lei mesmo! O dinheiro dos prêmios já está depositado na Capitalizadora 💰⚖️",
     },
   ]
 
@@ -136,7 +136,7 @@ export default function LegalitySection() {
                 ✅
               </motion.span>
               <span className="inline-block align-middle animate-text-glow-primary">
-                É CHANCE REAL DE GANHAR E AJUDAR
+                É TÍTULO DE CAPITALIZAÇÃO GAMIFICADO. CHANCE REAL DE GANHAR E AJUDAR
               </span>
             </li>
           </ul>

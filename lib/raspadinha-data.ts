@@ -1,4 +1,4 @@
-import type { UserProfile } from "@/types/admin" // Assuming UserProfile type exists in types/admin.ts
+import type { UserProfile } from "@/types/user"
 
 export interface Raspadinha {
   id: string
@@ -24,6 +24,7 @@ let mockUserProfile: UserProfile = {
   email: "joao@example.com",
   saldo_sacavel: 100.0,
   is_influencer: true,
+  chances_instantaneas: 0,
   // Add other properties from UserProfile if necessary
   created_at: new Date().toISOString(),
   last_login: new Date().toISOString(),

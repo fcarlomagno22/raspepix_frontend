@@ -553,7 +553,7 @@ export default function IntegracaoPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0D1117] text-white">
+    <div className="flex min-h-screen text-white">
       {/* Mobile Header */}
       <AdminHeaderMobile onOpenSidebar={() => setIsMobileSidebarOpen(true)} />
 

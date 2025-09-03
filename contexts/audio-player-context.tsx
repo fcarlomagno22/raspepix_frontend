@@ -2,17 +2,17 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useRef, useEffect, useCallback } from "react"
-import { usePathname } from "next/navigation" // Importar usePathname
-import { musicData, type MusicTrack } from "@/lib/music-data"
+import { usePathname } from "next/navigation"
+import type { Musica } from "@/types/musica"
 
 interface AudioPlayerContextType {
-  currentSong: MusicTrack | null
+  currentSong: Musica | null
   isPlaying: boolean
   togglePlayPause: () => void
   playNext: () => void
   playPrevious: () => void
   playSpecificSong: (index: number) => void
-  shufflePlaylist: () => void
+  shufflePlaylist: (playlist?: Musica[]) => void
   currentSongIndex: number | null
   volume: number
   setVolume: (volume: number) => void
@@ -29,22 +29,27 @@ const AudioPlayerContext = createContext<AudioPlayerContextType | undefined>(und
 export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const hasQueuedNext = useRef(false)
+  const hasAutoplayed = useRef(false)
   const [currentSongIndex, setCurrentSongIndex] = useState<number | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [shuffledPlaylist, setShuffledPlaylist] = useState<MusicTrack[]>([])
+  const [playlist, setPlaylist] = useState<Musica[]>([])
   const [volume, setVolumeState] = useState(0.5)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
 
-  const pathname = usePathname() // Usar o hook usePathname
+  const pathname = usePathname()
 
   const playNext = useCallback(() => {
-    if (!audioRef.current || shuffledPlaylist.length === 0) return
+    if (!audioRef.current || playlist.length === 0) return
     const nextIndex =
-      currentSongIndex === null || currentSongIndex >= shuffledPlaylist.length - 1 ? 0 : currentSongIndex + 1
+      currentSongIndex === null || currentSongIndex >= playlist.length - 1 ? 0 : currentSongIndex + 1
     setCurrentSongIndex(nextIndex)
-    const nextSong = shuffledPlaylist[nextIndex]
-    audioRef.current.src = nextSong.url
+    const nextSong = playlist[nextIndex]
+    if (!nextSong?.url_arquivo) {
+      console.warn("Música sem URL:", nextSong)
+      return
+    }
+    audioRef.current.src = nextSong.url_arquivo
     audioRef.current.load()
     audioRef.current
       .play()
@@ -53,37 +58,33 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.warn("Erro ao tocar próxima música:", err)
         setIsPlaying(false)
       })
-  }, [currentSongIndex, shuffledPlaylist])
+  }, [currentSongIndex, playlist])
 
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
       audioRef.current.volume = volume
+      if (!hasAutoplayed.current) {
+        hasAutoplayed.current = true;
+        playRandomSong(); // dispara o play aproveitando a última interação (login)
+      }
     }
+  }, [volume])
 
-    setShuffledPlaylist([...musicData])
-    if (musicData.length > 0) {
-      setCurrentSongIndex(0)
-      audioRef.current.src = musicData[0].url
-      audioRef.current.load()
-    }
-  }, [])
-
-  // Novo useEffect para parar a música ao acessar /logout
   useEffect(() => {
     if (pathname === "/logout") {
       if (audioRef.current) {
         audioRef.current.pause()
-        audioRef.current.currentTime = 0 // Zera o tempo de reprodução
-        audioRef.current.src = "" // Limpa a fonte do áudio
-        audioRef.current.load() // Força o carregamento de uma fonte vazia para parar completamente
+        audioRef.current.currentTime = 0
+        audioRef.current.src = ""
+        audioRef.current.load()
         setIsPlaying(false)
-        setCurrentTime(0) // Atualiza o estado para o display
-        setDuration(0) // Limpa a duração para o display
-        hasQueuedNext.current = false // Reseta a flag de próxima música
+        setCurrentTime(0)
+        setDuration(0)
+        hasQueuedNext.current = false
       }
     }
-  }, [pathname]) // Dependência no pathname para reagir à mudança de rota
+  }, [pathname])
 
   useEffect(() => {
     const handleEnded = () => {
@@ -133,9 +134,9 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const pauseSong = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause()
-      audioRef.current.currentTime = 0 // Resetar o tempo de reprodução para o início
-      audioRef.current.src = "" // Limpar a fonte do áudio
-      audioRef.current.load() // Carregar uma fonte vazia para parar completamente
+      audioRef.current.currentTime = 0
+      audioRef.current.src = ""
+      audioRef.current.load()
       setIsPlaying(false)
     }
   }, [])
@@ -145,12 +146,16 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [isPlaying, playSong, pauseSong])
 
   const playPrevious = useCallback(() => {
-    if (!audioRef.current || shuffledPlaylist.length === 0) return
+    if (!audioRef.current || playlist.length === 0) return
     const prevIndex =
-      currentSongIndex === null || currentSongIndex === 0 ? shuffledPlaylist.length - 1 : currentSongIndex - 1
+      currentSongIndex === null || currentSongIndex === 0 ? playlist.length - 1 : currentSongIndex - 1
     setCurrentSongIndex(prevIndex)
-    const prevSong = shuffledPlaylist[prevIndex]
-    audioRef.current.src = prevSong.url
+    const prevSong = playlist[prevIndex]
+    if (!prevSong?.url_arquivo) {
+      console.warn("Música sem URL:", prevSong)
+      return
+    }
+    audioRef.current.src = prevSong.url_arquivo
     audioRef.current.load()
     audioRef.current
       .play()
@@ -159,17 +164,17 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.warn("Erro ao tocar música anterior:", error)
         setIsPlaying(false)
       })
-  }, [currentSongIndex, shuffledPlaylist])
+  }, [currentSongIndex, playlist])
 
   const playSpecificSong = useCallback(
     (index: number) => {
-      if (!audioRef.current || !shuffledPlaylist.length || index < 0 || index >= shuffledPlaylist.length) {
+      if (!audioRef.current || !playlist.length || index < 0 || index >= playlist.length) {
         console.warn("Tentativa de tocar índice inválido:", index)
         return
       }
 
-      const selectedSong = shuffledPlaylist[index]
-      if (!selectedSong?.url) {
+      const selectedSong = playlist[index]
+      if (!selectedSong?.url_arquivo) {
         console.warn("Música não encontrada ou sem URL:", selectedSong)
         return
       }
@@ -178,9 +183,8 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
       audioRef.current.currentTime = 0
       hasQueuedNext.current = false
 
-      // Sempre atualiza a fonte, mesmo se for a mesma música
       setCurrentSongIndex(index)
-      audioRef.current.src = selectedSong.url
+      audioRef.current.src = selectedSong.url_arquivo
       audioRef.current.load()
       audioRef.current
         .play()
@@ -190,16 +194,12 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
           setIsPlaying(false)
         })
     },
-    [shuffledPlaylist],
+    [playlist],
   )
 
-  const shufflePlaylist = useCallback(() => {
-    const shuffled = [...musicData].sort(() => Math.random() - 0.5)
-    setShuffledPlaylist(shuffled)
-    if (shuffled.length > 0) {
-      const current = audioRef.current?.src
-      const newIndex = shuffled.findIndex((song) => song.url === current)
-      setCurrentSongIndex(newIndex !== -1 ? newIndex : 0)
+  const shufflePlaylist = useCallback((newPlaylist: Musica[] = []) => {
+    if (newPlaylist.length > 0) {
+      setPlaylist(newPlaylist)
     }
   }, [])
 
@@ -211,20 +211,44 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [])
 
   const playRandomSong = useCallback(() => {
-    if (!audioRef.current || shuffledPlaylist.length === 0) return
-    const randomIndex = Math.floor(Math.random() * shuffledPlaylist.length)
-    const randomSong = shuffledPlaylist[randomIndex]
+    if (isPlaying) {
+      console.log("Já existe uma música tocando, ignorando playRandomSong");
+      return;
+    }
+
+    if (!audioRef.current || playlist.length === 0) {
+      console.warn("Não há músicas na playlist ou o audio não está pronto");
+      return;
+    }
+    
+    const randomIndex = Math.floor(Math.random() * playlist.length)
+    const randomSong = playlist[randomIndex]
+    if (!randomSong?.url_arquivo) {
+      console.warn("Música sem URL:", randomSong)
+      return
+    }
+    
+    console.log("Tentando tocar música:", randomSong.titulo);
     setCurrentSongIndex(randomIndex)
-    audioRef.current.src = randomSong.url
+    audioRef.current.src = randomSong.url_arquivo
     audioRef.current.load()
-    audioRef.current
-      .play()
-      .then(() => setIsPlaying(true))
-      .catch((error) => {
-        console.warn("Erro ao tocar música aleatória:", error)
-        setIsPlaying(false)
-      })
-  }, [shuffledPlaylist])
+    
+    audioRef.current.volume = volume;
+    audioRef.current.muted = false;
+    
+    const playPromise = audioRef.current.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log("Música começou a tocar:", randomSong.titulo);
+          setIsPlaying(true);
+        })
+        .catch((error) => {
+          console.warn("Erro ao tocar música aleatória:", error);
+          setIsPlaying(false);
+        });
+    }
+  }, [playlist, volume, isPlaying]);
 
   const seekTo = useCallback((time: number) => {
     if (audioRef.current) {
@@ -232,7 +256,7 @@ export const AudioPlayerProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [])
 
-  const currentSong = currentSongIndex !== null ? shuffledPlaylist[currentSongIndex] : null
+  const currentSong = currentSongIndex !== null ? playlist[currentSongIndex] : null
 
   const value = {
     currentSong,

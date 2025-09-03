@@ -1,55 +1,40 @@
-"use client"
+import React, { useState } from "react"
+import { Input } from "./input"
 
-import * as React from "react"
-import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
-
-interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
-  value?: number // Value in cents
-  onChange?: (value: number) => void // Callback receives value in cents
+interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+  value: number
+  onChange: (value: number) => void
 }
 
-export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ value, onChange, className, ...props }, ref) => {
-    const [displayValue, setDisplayValue] = React.useState("R$ 0,00")
+export function CurrencyInput({ value, onChange, ...props }: CurrencyInputProps) {
+  const [displayValue, setDisplayValue] = useState(() => {
+    return value ? value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "R$ 0,00"
+  })
 
-    React.useEffect(() => {
-      if (value !== undefined && value !== null) {
-        const formatted = new Intl.NumberFormat("pt-BR", {
-          style: "currency",
-          currency: "BRL",
-        }).format(value / 100)
-        setDisplayValue(formatted)
-      } else {
-        setDisplayValue("R$ 0,00")
-      }
-    }, [value])
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    let value = event.target.value
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value
-      const numeros = raw.replace(/\D/g, "")
+    // Remove todos os caracteres não numéricos
+    value = value.replace(/[^\d]/g, "")
 
-      if (numeros.length === 0) {
-        setDisplayValue("R$ 0,00")
-        onChange?.(0)
-        return
-      }
+    // Converte para número e divide por 100 para considerar os centavos
+    const numericValue = Number(value) / 100
 
-      const valorCentavos = Number.parseInt(numeros, 10)
-      onChange?.(valorCentavos)
-    }
+    // Formata o valor para exibição
+    const formattedValue = numericValue.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    })
 
-    return (
-      <Input
-        ref={ref}
-        value={displayValue}
-        onChange={handleChange}
-        inputMode="numeric"
-        placeholder="R$ 0,00"
-        className={cn("bg-[#1A2430] border-[#9FFF00]/20 text-white", className)}
-        {...props}
-      />
-    )
-  },
-)
-CurrencyInput.displayName = "CurrencyInput"
+    setDisplayValue(formattedValue)
+    onChange(numericValue)
+  }
+
+  return (
+    <Input
+      {...props}
+      value={displayValue}
+      onChange={handleChange}
+    />
+  )
+}

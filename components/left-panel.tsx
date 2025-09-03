@@ -17,7 +17,7 @@ export default function LeftPanel() {
     { href: "/carteira", icon: Wallet, label: "Carteira" },
     { href: "/titulos", icon: Ticket, label: "Meus Títulos" },
     { href: "/resultados", icon: Award, label: "Resultados" },
-    { href: "/indique", icon: Users, label: "Indique e Ganhe" },
+    { href: "/indique", icon: Users, label: "Influencers" },
     { href: "/suporte", icon: LifeBuoy, label: "Suporte" },
     { href: "https://t.me/yourtelegramvip", icon: Telegram, label: "VIP Telegram", external: true }, // New button
     { href: "https://instagram.com/yourinstagram", icon: Instagram, label: "Instagram", external: true }, // New button

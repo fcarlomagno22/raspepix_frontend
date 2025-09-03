@@ -1,35 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getUserNotifications } from '@/services/api';
 
 export function useUnreadNotifications() {
   const [hasUnread, setHasUnread] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
-    const checkUnreadNotifications = async () => {
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+
+    (async () => {
       try {
-        setIsLoading(true);
-        const response = await getUserNotifications(1); // Pegamos apenas a primeira página
-        const hasUnreadNotifications = response.notifications.some(notification => !notification.read);
+        const response = await getUserNotifications(1);
+        const hasUnreadNotifications = response.notifications.some(
+          notification => !notification.read
+        );
         setHasUnread(hasUnreadNotifications);
-      } catch (error) {
-        console.error('Erro ao verificar notificações não lidas:', error);
+      } catch (err) {
+        console.error('Erro ao verificar notificações não lidas:', err);
+        setError(err instanceof Error ? err.message : 'Erro ao carregar notificações');
         setHasUnread(false);
       } finally {
         setIsLoading(false);
       }
-    };
-
-    checkUnreadNotifications();
-
-    // Verificar a cada 5 minutos
-    const interval = setInterval(checkUnreadNotifications, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, []);
+    })();
+  }, []); // array vazio para executar apenas no mount
 
   return {
     hasUnread,
-    isLoading
+    isLoading,
+    error
   };
 } 

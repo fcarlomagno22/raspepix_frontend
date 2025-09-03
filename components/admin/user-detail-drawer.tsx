@@ -28,7 +28,6 @@ interface Prize {
   status: "pending" | "paid"
 }
 
-// Reutilizando a interface User do user-table.tsx
 import type { User } from "./user-table"
 
 interface UserDetailDrawerProps {
@@ -102,7 +101,7 @@ export function UserDetailDrawer({
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-[50vw] bg-[#232A34] border-[#366D51] text-white overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-xl font-bold text-white">{drawerUser?.nome_completo}</SheetTitle>
+          <SheetTitle className="text-xl font-bold text-white">{drawerUser?.full_name}</SheetTitle>
           <SheetDescription className="text-gray-400">Histórico detalhado de compras e prêmios</SheetDescription>
         </SheetHeader>
 
@@ -123,7 +122,9 @@ export function UserDetailDrawer({
                 <div>
                   <span className="text-gray-400">Cadastro:</span>
                   <p className="text-white font-medium">
-                    {format(new Date(drawerUser.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                    {drawerUser.created_at 
+                      ? format(new Date(drawerUser.created_at), "dd/MM/yyyy", { locale: ptBR })
+                      : "Data não disponível"}
                   </p>
                 </div>
                 <div>
@@ -171,7 +172,11 @@ export function UserDetailDrawer({
                     </div>
                     <div className="flex justify-between items-center text-sm text-gray-400">
                       <span>Edição: {purchase.edition}</span>
-                      <span>{format(new Date(purchase.date), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
+                      <span>
+                        {purchase.date 
+                          ? format(new Date(purchase.date), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                          : "Data não disponível"}
+                      </span>
                     </div>
                   </div>
                 ))
@@ -198,7 +203,9 @@ export function UserDetailDrawer({
                       <div className="text-right">
                         <p className="text-[#9FFF00] font-bold text-lg">{formatCurrency(prize.value)}</p>
                         <p className="text-gray-400 text-sm">
-                          {format(new Date(prize.date), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                          {prize.date 
+                            ? format(new Date(prize.date), "dd/MM/yyyy HH:mm", { locale: ptBR })
+                            : "Data não disponível"}
                         </p>
                       </div>
                     </div>

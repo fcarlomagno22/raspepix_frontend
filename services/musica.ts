@@ -1,14 +1,23 @@
-import { api } from "./api";
-import { MusicaResponse } from "@/types/musica";
+import { MusicaResponse } from '@/types/musica';
+import { musicData } from '@/lib/music-data';
 
-interface GetMusicasParams {
-  page?: number;
-  titulo?: string;
-}
+export const getMusicas = async (page: number = 1): Promise<MusicaResponse> => {
+  try {
+    // Converte os dados mockados para o formato esperado
+    const musicas = musicData.map(track => ({
+      id: track.id,
+      titulo: track.title,
+      url_arquivo: track.url
+    }));
 
-export const getMusicasPublicas = async ({ page = 1, titulo = "" }: GetMusicasParams): Promise<MusicaResponse> => {
-  const response = await api.get<MusicaResponse>("/api/musicas", {
-    params: { page, titulo }
-  });
-  return response.data;
+    return {
+      data: musicas,
+      total: musicas.length,
+      page: 1,
+      totalPages: 1
+    };
+  } catch (error) {
+    console.error('Erro ao buscar músicas:', error);
+    throw new Error('Não foi possível carregar as músicas');
+  }
 }; 

@@ -1,63 +1,90 @@
 "use client"
 
 import { Label } from "@/components/ui/label"
-
-import React from "react"
-import Image from "next/image"
-import { useRouter } from "next/navigation" // Importar useRouter
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Mail, Eye, EyeOff } from "lucide-react"
-import Cookies from 'js-cookie'
-import { api } from "@/services/api"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/components/ui/use-toast"
+import React, { useRef } from "react"
+import Image from "next/image"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Mail, Eye, EyeOff, AlertCircle } from "lucide-react"
+import { api, getErrorMessage } from "@/services/api"
+import { login } from "@/services/auth"
+import { useAudioPlayer } from '@/contexts/audio-player-context';
+import type { Musica } from '@/types/musica';
 
 const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState(false)
   const [showPassword, setShowPassword] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null) // Estado para mensagens de erro
-  const router = useRouter() // Inicializar useRouter
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const router = useRouter()
+  const { toast } = useToast()
+  const { shufflePlaylist, playRandomSong } = useAudioPlayer()
+
+  const resetForm = () => {
+    if (formRef.current) {
+      formRef.current.reset()
+    }
+  }
+
+  const handleError = (error: any) => {
+    const status = error?.response?.status
+    const errorMessage = getErrorMessage(error)
+
+    // Tratamento específico para usuário bloqueado
+    if (status === 403) {
+      setIsBlocked(true)
+      resetForm()
+      return "Sua conta está bloqueada. Chame a gente em contato@raspepix.com.br para saber mais."
+    }
+
+    // Tratamento para credenciais inválidas
+    if (errorMessage.includes("Invalid login credentials")) {
+      return "E-mail ou senha inválidos"
+    }
+
+    // Evitar mensagem de sessão expirada
+    if (errorMessage.includes("Sessão expirada")) {
+      return "Não foi possível fazer login. Por favor, tente novamente."
+    }
+
+    return errorMessage
+  }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault()
+    setErrorMessage(null)
     setIsLoading(true)
-    setError(null) // Limpar erros anteriores
-
-    const formData = new FormData(event.currentTarget as HTMLFormElement)
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
 
     try {
-      const response = await api.post('/api/auth/login', { email, password });
+      const formData = new FormData(event.currentTarget as HTMLFormElement)
+      const email = formData.get("email") as string
+      const password = formData.get("password") as string
 
-      // Define os cookies com expiração de 1 hora
-      const oneHour = new Date(new Date().getTime() + 60 * 60 * 1000);
-      Cookies.set('access_token', response.data.access_token, { expires: oneHour });
-      Cookies.set('refresh_token', response.data.refresh_token, { expires: oneHour });
-      Cookies.set('user', JSON.stringify(response.data.user), { expires: oneHour });
+      // 1) Tenta fazer login
+      await login({ email, password })
 
-      // Redireciona para a página home usando replace em vez de push
-      router.replace('/home');
-    } catch (err: any) {
-      if (err.response) {
-        switch (err.response.status) {
-          case 400:
-            setError('Dados inválidos. Verifique suas informações.');
-            break;
-          case 401:
-            setError('Email ou senha incorretos.');
-            break;
-          case 500:
-            setError('Erro no servidor. Tente novamente mais tarde.');
-            break;
-          default:
-            setError('Erro ao fazer login. Tente novamente.');
-        }
-      } else {
-        setError('Erro ao conectar ao servidor. Verifique sua conexão.');
-      }
+      // 2) Se login bem sucedido, busca playlist
+      const playlist = await api.get<{ data: Musica[] }>('/api/musica', {
+        params: { page: 1, perPage: 25 },
+      })
+
+      // 3) Configura playlist e inicia música
+      shufflePlaylist(playlist.data.data)
+      playRandomSong()
+
+      // 4) Navega para home
+      router.push('/home')
+    } catch (error: any) {
+      console.error('Erro no login:', error)
+      const errorMsg = handleError(error)
+      setErrorMessage(errorMsg)
+      resetForm()
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
   }
 
@@ -87,7 +114,13 @@ const LoginForm: React.FC = () => {
       ) : (
         <>
           <CardContent>
-            <form onSubmit={onSubmit} className="space-y-4">
+            <form ref={formRef} method="POST" onSubmit={onSubmit} className="space-y-4">
+              {errorMessage && (
+                <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-400">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-gray-300">
                   Email
@@ -117,6 +150,7 @@ const LoginForm: React.FC = () => {
                     variant="link"
                     className="px-0 font-normal text-xs text-[#9ffe00] hover:text-[#9ffe00]/80"
                     onClick={() => router.push("/recuperarsenha")}
+                    type="button"
                   >
                     Esqueceu a senha?
                   </Button>
@@ -157,7 +191,7 @@ const LoginForm: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
               <Button
                 type="submit"
                 className="w-full bg-[#9ffe00] hover:bg-[#9ffe00]/90 text-[#191F26] font-medium transition-all duration-300 shadow-glow-sm hover:shadow-glow"
@@ -174,6 +208,7 @@ const LoginForm: React.FC = () => {
                 variant="link"
                 className="p-0 text-[#9ffe00] hover:text-[#9ffe00]/80"
                 onClick={() => router.push("/cadastro")}
+                type="button"
               >
                 Criar conta
               </Button>

@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import LotteryEditionsTable from "@/components/admin/sorteios/lottery-editions-table"
 import LotteryEditionDrawer from "@/components/admin/lottery-edition-drawer"
 import { type LotteryEdition, type LotteryEditionStatus } from "@/lib/mock-lottery-data"
-import { sorteioService, type SorteioEdicao } from "@/services/sorteio"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/hooks/use-auth"
+import { getEdicoes, type SorteioEdicao, atualizarStatusEdicao, excluirEdicao } from "@/services/sorteio"
+import { getErrorMessage } from "@/services/api"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import Cookies from "js-cookie"
 
 export default function AdminLotteryPage() {
   useAuth(true); // Adiciona verificação de autenticação de admin
@@ -45,17 +47,36 @@ export default function AdminLotteryPage() {
     loadEdicoes()
   }, [])
 
+  const mapApiEditionToFrontend = (apiEdition: SorteioEdicao): LotteryEdition => {
+    return {
+      id: apiEdition.id,
+      name: apiEdition.nome,
+      lotteryPrize: apiEdition.valor_sorteio,
+      instantPrizes: apiEdition.valor_premios_instantaneos,
+      startDate: new Date(apiEdition.data_inicio),
+      endDate: new Date(apiEdition.data_fim),
+      status: apiEdition.status as LotteryEditionStatus,
+      totalInstantTicketsToCreate: 0, // Campo não disponível na API
+      numInstantPrizesToDistribute: 0,
+      minInstantPrizeValue: 0,
+      maxInstantPrizeValue: 0,
+      generatedInstantPrizes: [],
+      capitalizadoraWinningNumbersInput: "",
+      capitalizadoraNumbers: []
+    }
+  }
+
   const loadEdicoes = async () => {
     try {
       setIsLoading(true)
-      const edicoes = await sorteioService.listarEdicoes()
-      const mappedEdicoes: LotteryEdition[] = edicoes.map(mapSorteioToLotteryEdition)
+      const edicoes = await getEdicoes()
+      const mappedEdicoes = edicoes.map(mapApiEditionToFrontend)
       setLotteryEditions(mappedEdicoes)
     } catch (error) {
       console.error('Erro ao carregar edições:', error)
       toast({
         title: "Erro ao carregar edições",
-        description: "Ocorreu um erro ao carregar as edições. Por favor, tente novamente.",
+        description: getErrorMessage(error),
         variant: "destructive"
       })
     } finally {
@@ -63,55 +84,56 @@ export default function AdminLotteryPage() {
     }
   }
 
-  const mapSorteioToLotteryEdition = (sorteio: SorteioEdicao): LotteryEdition => {
-    return {
-      id: sorteio.id,
-      name: sorteio.nome,
-      lotteryPrize: sorteio.valor_sorteio,
-      instantPrizes: sorteio.valor_premios_instantaneos,
-      startDate: new Date(sorteio.data_inicio),
-      endDate: new Date(sorteio.data_fim),
-      status: sorteio.status as LotteryEditionStatus,
-      totalInstantTicketsToCreate: sorteio.configuracoes_premios.total_titulos,
-      numInstantPrizesToDistribute: sorteio.configuracoes_premios.quantidade_premios,
-      minInstantPrizeValue: sorteio.configuracoes_premios.valor_minimo,
-      maxInstantPrizeValue: sorteio.configuracoes_premios.valor_maximo,
-      generatedInstantPrizes: [],
-      capitalizadoraWinningNumbersInput: "",
-      capitalizadoraNumbers: []
-    }
-  }
-
   const handleConfirmDelete = async () => {
-    if (!isDeletingId) return
+    if (!isDeletingId) return;
 
     try {
-      setIsDeleting(true)
-      await sorteioService.excluirEdicao(isDeletingId)
-      
-      // Atualiza a lista removendo a edição excluída
-      setLotteryEditions(lotteryEditions.filter((ed) => ed.id !== isDeletingId))
+      setIsDeleting(true);
+      await excluirEdicao(isDeletingId);
+      // Remove localmente após confirmação da API
+      setLotteryEditions(lotteryEditions.filter((ed) => ed.id !== isDeletingId));
       
       toast({
         title: "Sucesso",
         description: "Edição excluída com sucesso",
-      })
+      });
     } catch (error: any) {
-      console.error('Erro ao excluir edição:', error)
+      console.error('Erro ao excluir edição:', error);
       
-      toast({
-        title: "Erro ao excluir edição",
-        description: error.message || "Ocorreu um erro ao tentar excluir a edição",
-        variant: error.type === 'warning' ? 'warning' : 'destructive'
-      })
+      // Verifica a mensagem exata da API
+      if (error.message === "Não é possível excluir uma edição que já possui números comprados") {
+        toast({
+          title: "Operação não permitida",
+          description: "Não é possível excluir esta edição pois existem números comprados. Esta é uma medida de segurança para proteger o histórico de vendas e garantir a integridade dos dados dos compradores.",
+          variant: "warning",
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: "Erro ao excluir edição",
+          description: error.message || "Ocorreu um erro ao tentar excluir a edição",
+          variant: error.type === 'warning' ? 'warning' : 'destructive'
+        });
+      }
     } finally {
-      setIsDeleting(false)
-      setShowDeleteConfirm(false)
-      setIsDeletingId(null)
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+      setIsDeletingId(null);
     }
-  }
+  };
 
   const handleDeleteEdition = (id: string) => {
+    // Verifica se pode excluir baseado no status
+    const edition = lotteryEditions.find(ed => ed.id === id)
+    if (edition && edition.status !== "futuro") {
+      toast({
+        title: "Operação não permitida",
+        description: "Apenas edições com status 'Futuro' podem ser excluídas.",
+        variant: "warning"
+      })
+      return
+    }
+    
     setIsDeletingId(id)
     setShowDeleteConfirm(true)
   }
@@ -140,6 +162,16 @@ export default function AdminLotteryPage() {
   }
 
   const handleEditEdition = (edition: LotteryEdition) => {
+    // Verifica se pode editar baseado no status
+    if (edition.status !== "futuro") {
+      toast({
+        title: "Operação não permitida",
+        description: "Apenas edições com status 'Futuro' podem ser editadas.",
+        variant: "warning"
+      })
+      return
+    }
+    
     setEditingEdition(edition)
     setIsDrawerOpen(true)
   }
@@ -156,8 +188,43 @@ export default function AdminLotteryPage() {
     setEditingEdition(null)
   }
 
-  const handleStatusChange = (id: string, newStatus: LotteryEditionStatus) => {
-    setLotteryEditions(lotteryEditions.map((ed) => (ed.id === id ? { ...ed, status: newStatus } : ed)))
+  const handleStatusChange = async (id: string, newStatus: LotteryEditionStatus) => {
+    try {
+      await atualizarStatusEdicao(id, newStatus);
+      setLotteryEditions(lotteryEditions.map((ed) => (ed.id === id ? { ...ed, status: newStatus } : ed)));
+      toast({
+        title: "Sucesso",
+        description: "Status da edição atualizado com sucesso",
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      
+      // Se for erro de autenticação, mostra mensagem específica
+      if (error instanceof Error && error.message.includes('Sessão expirada')) {
+        toast({
+          title: "Sessão Expirada",
+          description: "Sua sessão expirou. Por favor, faça login novamente.",
+          variant: "destructive"
+        });
+        
+        // Redireciona após 2 segundos para dar tempo de ler a mensagem
+        setTimeout(() => {
+          Cookies.remove('admin_token');
+          window.location.href = '/admin/login';
+        }, 2000);
+        
+        return;
+      }
+      
+      toast({
+        title: "Erro ao atualizar status",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
+      
+      // Recarrega os dados para garantir consistência
+      loadEdicoes();
+    }
   }
 
   const handlePageChange = (page: number) => {
@@ -165,7 +232,7 @@ export default function AdminLotteryPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0D1117]">
+    <div className="flex min-h-screen">
       <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="flex flex-col flex-1 lg:ml-[240px]">
         <AdminHeaderMobile onOpenSidebar={() => setIsSidebarOpen(true)} />

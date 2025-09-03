@@ -84,7 +84,7 @@ export default function AuditPage() {
   )
 
   return (
-    <div className="flex min-h-screen bg-[#191F26]">
+    <div className="flex min-h-screen">
       <AdminSidebar />
       <div className="flex-1 flex flex-col lg:ml-64">
         <AdminHeaderMobile

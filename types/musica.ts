@@ -1,7 +1,7 @@
 export interface Musica {
+  id: string;
   titulo: string;
-  artista: string;
-  criada_em: string;
+  url_arquivo: string;
 }
 
 export interface MusicaResponse {

@@ -1,26 +1,62 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import PartnershipTermsModal from "@/components/network/partnership-terms-modal"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import AuthenticatedLayout from "@/components/authenticated-layout"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Award, Gift, TrendingUp, Loader2 } from "lucide-react"
+import { Gift, TrendingUp, Loader2, Award, Wallet } from "lucide-react"
 import { CommissionLevelCard } from "@/components/network/commission-level-card"
 import { NetworkTreeView } from "@/components/network/network-tree-view"
 import { InviteSection } from "@/components/network/invite-section"
 import { NetworkOverview } from "@/components/network/network-overview"
 import { ResourcesSection } from "@/components/network/resources-section"
+import { WithdrawBalanceCard } from "@/components/network/withdraw-balance-card"
+import { NetworkTransactionsList } from "@/components/network/network-transactions-list"
+import { WithdrawRequestsList } from "@/components/network/withdraw-requests-list"
+import { PromotionProgress } from "@/components/network/promotion-progress"
 import { useNetwork } from "@/hooks/use-network"
+import { useInfluencerStatus } from "@/hooks/use-influencer-status"
 
 export default function IndiquePage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"overview" | "network" | "resources">("overview")
+  const [mounted, setMounted] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
+  const [activeTab, setActiveTab] = useState<"overview" | "network" | "resources" | "financial">("overview")
   const clientLink = "https://raspepix.com/cliente/seulink"
   const influencerLink = "https://raspepix.com/influencer/seulink"
 
-  const { networkStats, networkTree, marketingResources, isLoading, error } = useNetwork()
+  const { networkStats, networkTree, marketingResources, isLoading: isLoadingNetwork, error: networkError } = useNetwork()
+  const { isInfluencer, isLoading: isLoadingInfluencer } = useInfluencerStatus()
+
+  useEffect(() => {
+    setMounted(true)
+    // Mostra o modal apenas se o usuário não for influencer e já tivermos carregado o status
+    if (!isLoadingInfluencer) {
+      setShowTerms(!isInfluencer)
+    }
+  }, [isLoadingInfluencer, isInfluencer])
+
+  const handleAcceptTerms = () => {
+    setShowTerms(false)
+  }
+
+  if (!mounted) {
+    return (
+      <AuthenticatedLayout>
+        <main className="flex-1 pt-4 pb-24 px-4 w-full">
+          <div className="flex items-center justify-center h-[60vh]">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 text-[#9FFF00] animate-spin" />
+              <p className="text-gray-400">Carregando sua rede...</p>
+            </div>
+          </div>
+        </main>
+      </AuthenticatedLayout>
+    )
+  }
 
   const handleShare = async (type: "client" | "influencer") => {
     const link = type === "client" ? clientLink : influencerLink
@@ -44,7 +80,7 @@ export default function IndiquePage() {
     }
   }
 
-  if (isLoading) {
+  if (isLoadingNetwork || isLoadingInfluencer) {
     return (
       <AuthenticatedLayout>
         <main className="flex-1 pt-4 pb-24 px-4 w-full">
@@ -59,7 +95,7 @@ export default function IndiquePage() {
     )
   }
 
-  if (error) {
+  if (networkError) {
     return (
       <AuthenticatedLayout>
         <main className="flex-1 pt-4 pb-24 px-4 w-full">
@@ -81,36 +117,34 @@ export default function IndiquePage() {
 
   return (
     <AuthenticatedLayout>
+      {showTerms && <PartnershipTermsModal isOpen={showTerms} onAccept={handleAcceptTerms} />}
       <main className="flex-1 pt-4 pb-24 px-4 w-full">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2 justify-center mb-4">
             <Gift className="h-7 w-7 text-[#9FFF00]" />
             Influencer Multinível
           </h1>
-          <Button
-            variant="outline"
-            className="text-[#9FFF00] border-[#9FFF00]"
-            onClick={() => router.push("/carreira")}
-          >
-            <Award className="h-5 w-5 mr-2" />
-            Plano de Carreira
-          </Button>
+          <PromotionProgress />
         </div>
 
         {/* Seção de Convites */}
         <div className="mb-6">
           <InviteSection
-            clientLink={clientLink}
-            influencerLink={influencerLink}
             onShare={handleShare}
+            isInfluencer={isInfluencer}
           />
+        </div>
+
+        {/* Card de Saldo */}
+        <div className="mb-6">
+          <WithdrawBalanceCard />
         </div>
 
         {/* Cards de Níveis */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          {networkStats?.map((stats) => (
-            <CommissionLevelCard key={stats.level} stats={stats} />
-          ))}
+          <CommissionLevelCard level={1} />
+          <CommissionLevelCard level={2} />
+          <CommissionLevelCard level={3} />
         </div>
 
         {/* Tabs */}
@@ -138,6 +172,13 @@ export default function IndiquePage() {
                 <Award className="h-4 w-4 mr-2" />
                 Recursos
               </TabsTrigger>
+              <TabsTrigger
+                value="financial"
+                className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                Financeiro
+              </TabsTrigger>
             </TabsList>
 
             <motion.div
@@ -147,7 +188,7 @@ export default function IndiquePage() {
               className="mt-6"
             >
               <TabsContent value="overview">
-                {networkStats && <NetworkOverview stats={networkStats} />}
+                <NetworkOverview />
               </TabsContent>
 
               <TabsContent value="network">
@@ -156,6 +197,37 @@ export default function IndiquePage() {
 
               <TabsContent value="resources">
                 {marketingResources && <ResourcesSection resources={marketingResources} />}
+              </TabsContent>
+
+              <TabsContent value="financial">
+                <div className="bg-[#232A34] rounded-lg p-6">
+                  <Tabs defaultValue="transactions" className="space-y-6">
+                    <div className="flex justify-center">
+                      <TabsList className="bg-[#1E2530] p-1 w-full max-w-[1000px]">
+                        <TabsTrigger
+                          value="transactions"
+                          className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                        >
+                          Transações da Rede
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="withdrawals"
+                          className="flex-1 data-[state=active]:bg-[#9FFF00] data-[state=active]:text-[#191F26]"
+                        >
+                          Solicitações de Saque
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+
+                    <TabsContent value="transactions" className="mt-6">
+                      <NetworkTransactionsList />
+                    </TabsContent>
+
+                    <TabsContent value="withdrawals" className="mt-6">
+                      <WithdrawRequestsList />
+                    </TabsContent>
+                  </Tabs>
+                </div>
               </TabsContent>
             </motion.div>
           </Tabs>
