@@ -36,6 +36,8 @@ export type LotteryEditionStatus = "futuro" | "ativo" | "encerrado"
 export type LotteryEdition = {
   id: string
   name: string
+  susepProcess?: string
+  editionNumber?: number
   lotteryPrize: number
   instantPrizes: number
   startDate: Date
@@ -113,16 +115,12 @@ export const mockLotteryEditions: LotteryEdition[] = [
   {
     id: "le1",
     name: "Edição #1 - Verão Premiado",
+    susepProcess: "15414.000001/2024-01",
+    editionNumber: 1,
     lotteryPrize: 10000,
     instantPrizes: 2000,
     startDate: new Date("2024-01-01"),
     endDate: new Date("2024-01-31"),
-    // These fields will be removed or adapted if not used anymore
-    // costPlanId: "ep1",
-    // linkedScratchCards: [
-    //   { scratchCardId: "sc1", expectedSalesVolume: 5000, instantPrizesToDistribute: 1000 },
-    //   { scratchCardId: "sc3", expectedSalesVolume: 2000, instantPrizesToDistribute: 500 },
-    // ],
     status: "encerrado",
     totalInstantTicketsToCreate: 1000000,
     numInstantPrizesToDistribute: 100,
@@ -140,15 +138,12 @@ export const mockLotteryEditions: LotteryEdition[] = [
   {
     id: "le2",
     name: "Edição #2 - Outono da Sorte",
+    susepProcess: "15414.000002/2024-02",
+    editionNumber: 2,
     lotteryPrize: 15000,
     instantPrizes: 3000,
     startDate: new Date("2024-03-01"),
     endDate: new Date("2024-03-31"),
-    // costPlanId: "ep2",
-    // linkedScratchCards: [
-    //   { scratchCardId: "sc1", expectedSalesVolume: 7000, instantPrizesToDistribute: 1500 },
-    //   { scratchCardId: "sc2", expectedSalesVolume: 3000, instantPrizesToDistribute: 1000 },
-    // ],
     status: "ativo",
     totalInstantTicketsToCreate: 1000000,
     numInstantPrizesToDistribute: 150,
@@ -161,12 +156,12 @@ export const mockLotteryEditions: LotteryEdition[] = [
   {
     id: "le3",
     name: "Edição #3 - Inverno Milionário",
+    susepProcess: "15414.000003/2024-03",
+    editionNumber: 3,
     lotteryPrize: 20000,
     instantPrizes: 5000,
     startDate: new Date("2024-07-01"),
     endDate: new Date("2024-07-31"),
-    // costPlanId: "ep1",
-    // linkedScratchCards: [{ scratchCardId: "sc2", expectedSalesVolume: 4000, instantPrizesToDistribute: 2000 }],
     status: "futuro",
     totalInstantTicketsToCreate: 1000000,
     numInstantPrizesToDistribute: 200,

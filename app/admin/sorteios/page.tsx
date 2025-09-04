@@ -51,15 +51,17 @@ export default function AdminLotteryPage() {
     return {
       id: apiEdition.id,
       name: apiEdition.nome,
+      susepProcess: apiEdition.susep_process,
+      editionNumber: apiEdition.edition_number,
       lotteryPrize: apiEdition.valor_sorteio,
       instantPrizes: apiEdition.valor_premios_instantaneos,
       startDate: new Date(apiEdition.data_inicio),
       endDate: new Date(apiEdition.data_fim),
       status: apiEdition.status as LotteryEditionStatus,
-      totalInstantTicketsToCreate: 0, // Campo não disponível na API
-      numInstantPrizesToDistribute: 0,
-      minInstantPrizeValue: 0,
-      maxInstantPrizeValue: 0,
+      totalInstantTicketsToCreate: apiEdition.configuracoes_premios?.total_titulos || 0,
+      numInstantPrizesToDistribute: apiEdition.configuracoes_premios?.quantidade_premios || 0,
+      minInstantPrizeValue: apiEdition.configuracoes_premios?.valor_minimo || 0,
+      maxInstantPrizeValue: apiEdition.configuracoes_premios?.valor_maximo || 0,
       generatedInstantPrizes: [],
       capitalizadoraWinningNumbersInput: "",
       capitalizadoraNumbers: []

@@ -93,12 +93,17 @@ export default function LotteryEditionsTable({
           ) : (
             editions.map((edition) => (
               <TableRow key={`row-${edition.id}`} className="border-[#9FFF00]/10 hover:bg-[#1A2430]">
-                <TableCell key={`name-${edition.id}`} className="font-medium text-white text-center">{edition.name}</TableCell>
+                <TableCell key={`name-${edition.id}`} className="font-medium text-white text-center">
+                  {edition.editionNumber && (
+                    <span className="text-[#9FFF00] font-bold mr-2">#{edition.editionNumber}</span>
+                  )}
+                  {edition.name}
+                </TableCell>
                 <TableCell key={`period-${edition.id}`} className="text-gray-300 text-center">
                   {formatDateDisplay(edition.startDate)} até {formatDateDisplay(edition.endDate)}
                 </TableCell>
                 <TableCell key={`prize-${edition.id}`} className="text-gray-300 text-center">{formatCurrency(edition.lotteryPrize)}</TableCell>
-                <TableCell key={`instant-${edition.id}`} className="text-gray-300 text-center">{"R$ 30.000,00"}</TableCell>
+                <TableCell key={`instant-${edition.id}`} className="text-gray-300 text-center">{formatCurrency(edition.instantPrizes)}</TableCell>
                 <TableCell key={`status-${edition.id}`} className="text-center flex items-center justify-center">
                   {/* Dropdown for status, replacing the Badge */}
                   <Select

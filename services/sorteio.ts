@@ -10,7 +10,14 @@ export interface SorteioEdicao {
   status: string;
   criado_em: string;
   atualizado_em: string;
-  configuracoes_premios: any;
+  susep_process: string;
+  edition_number: number;
+  configuracoes_premios: {
+    valor_maximo: number;
+    valor_minimo: number;
+    total_titulos: number;
+    quantidade_premios: number;
+  };
 }
 
 export interface Bilhete {
