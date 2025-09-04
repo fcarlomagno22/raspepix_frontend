@@ -38,7 +38,7 @@ export default function AdminHeaderMobile({ onLogout }: AdminHeaderMobileProps) 
     { href: "/admin/financeiro", icon: DollarSign, label: "Financeiro", permission: "financeiro" },
     { href: "/admin/sorteios", icon: Ticket, label: "Sorteios", permission: "sorteio" },
     { href: "/admin/raspadinhas", icon: Gift, label: "Raspadinhas", permission: "raspadinhas" },
-    { href: "/admin/influencers", icon: Network, label: "Influencers", permission: "influencers" },
+    { href: "/admin/afiliados", icon: Network, label: "Afiliados", permission: "afiliados" },
     { href: "/admin/afiliados", icon: Users, label: "Afiliados", permission: "afiliados" },
     { href: "/admin/playlist", icon: Music, label: "Playlist", permission: "playlist" },
     { href: "/admin/hq", icon: BookOpen, label: "HQs", permission: "hq" },

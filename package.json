@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@babel/runtime": "^7.28.3",
     "@emotion/is-prop-valid": "latest",
     "@hookform/resolvers": "latest",
     "@radix-ui/react-accordion": "1.2.2",
@@ -54,6 +55,8 @@
     "cmdk": "1.0.4",
     "date-fns": "latest",
     "embla-carousel-react": "8.5.1",
+    "fast-png": "^7.0.1",
+    "fflate": "^0.8.2",
     "framer-motion": "latest",
     "html2canvas": "latest",
     "input-otp": "1.4.1",

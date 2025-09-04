@@ -571,8 +571,8 @@ export default function IntegracaoPage() {
         {/* Header da Página */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-white">Integração CAPEMISA</h1>
-            <p className="text-gray-400 mt-2">Geração automática e envio de arquivos para a CAPEMISA</p>
+            <h1 className="text-3xl font-bold text-white">Integração Capitalizadora</h1>
+            <p className="text-gray-400 mt-2">Geração automática e envio de arquivos para a Capitalizadora</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 mt-4 sm:mt-0">
             <Button

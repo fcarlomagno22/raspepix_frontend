@@ -74,7 +74,7 @@ export function InfluencerSelectionModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="bg-[#232A34] border-[#366D51] text-white max-w-5xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-[#9FFF00]">Selecionar Influencer</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-[#9FFF00]">Selecionar Afiliado</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -95,7 +95,7 @@ export function InfluencerSelectionModal({
               </div>
             ) : paginatedInfluencers.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400">
-                Nenhum influencer encontrado
+                Nenhum afiliado encontrado
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">

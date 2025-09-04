@@ -394,7 +394,7 @@ export function PromotionsManager({ initialPromotions, onSave, onDelete }: Promo
                             Nome
                           </TableHead>
                           <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Código do Influencer
+                            Código do Afiliado
                           </TableHead>
                           <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
                             Progresso

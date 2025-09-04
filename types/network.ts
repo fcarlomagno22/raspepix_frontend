@@ -112,7 +112,7 @@ export interface CommissionLevel {
   description: string
 }
 
-// Tipos para a API de influencers
+// Tipos para a API de afiliados
 export interface InfluencerComissao {
   nivel: "direto" | "secundario" | "expandido"
   percentual: number

@@ -248,7 +248,7 @@ export async function buscarTotalTitulosPendentes(edicaoId: string): Promise<num
 
 export async function atualizarStatusPagamentoTitulo(tituloId: string, novoStatus: 'PAGO' | 'PENDENTE') {
   try {
-    const response = await api.patch(`/api/sorteio/titulos/${tituloId}/status-pagamento`, {
+    const response = await api.patch(`/api/sorteio/titulos/${tituloId}/pagamento`, {
       status_pagamento: novoStatus
     });
     return response.data;

@@ -110,7 +110,7 @@ export function CommissionManager({ influencers, initialCommissions, onSave }: C
       <div className="space-y-6">
         <div className="space-y-2">
           <label className="text-sm text-gray-400">
-            Selecione o Influencer
+            Selecione o Afiliado
           </label>
           <div className="space-y-4">
             <Select
@@ -132,13 +132,13 @@ export function CommissionManager({ influencers, initialCommissions, onSave }: C
                   <SelectItem value="all" className="text-white hover:bg-[#2A3440] hover:text-[#9FFF00] focus:bg-[#2A3440] focus:text-[#9FFF00]">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      <span>Todos os Influencers</span>
+                      <span>Todos os Afiliados</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="specific" className="text-white hover:bg-[#2A3440] hover:text-[#9FFF00] focus:bg-[#2A3440] focus:text-[#9FFF00]">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      <span>Selecionar Influencer</span>
+                      <span>Selecionar Afiliado</span>
                     </div>
                   </SelectItem>
                 </SelectGroup>
@@ -196,7 +196,7 @@ export function CommissionManager({ influencers, initialCommissions, onSave }: C
             </div>
             <p className="text-xs text-gray-500">
               {commission.level === 1
-                ? "Comissão para indicações diretas do influencer"
+                ? "Comissão para indicações diretas do afiliado"
                 : commission.level === 2
                 ? "Comissão sobre vendas da rede secundária"
                 : "Comissão sobre vendas da rede expandida"}

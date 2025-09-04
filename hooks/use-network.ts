@@ -121,7 +121,7 @@ const fetchMarketingResources = async (): Promise<MarketingResource[]> => {
         {
           id: "1",
           title: "Kit de Boas-vindas",
-          description: "Material completo para novos influencers começarem com tudo!",
+          description: "Material completo para novos afiliados começarem com tudo!",
           type: "document",
           url: "/marketing/kit-boasvindas.pdf",
           category: "presentation",

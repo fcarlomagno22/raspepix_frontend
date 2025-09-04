@@ -48,7 +48,7 @@ export default function AdminSidebar({ onLogout }: AdminSidebarProps) {
       permission: "usuarios",
       items: [
         { href: "/admin/clientes", label: "Clientes", permission: "clientes" },
-        { href: "/admin/afiliados", label: "Influencers", permission: "afiliados" },
+        { href: "/admin/afiliados", label: "Afiliados", permission: "afiliados" },
       ],
     },
     { href: "/admin/financeiro", icon: DollarSign, label: "Financeiro", permission: "financeiro" },

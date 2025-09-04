@@ -564,7 +564,7 @@ export default function AdminAffiliatesPage() {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
               <Gift className="h-7 w-7 text-[#9FFF00]" />
-              Gestão de Influencers
+              Gestão de Afiliados
             </h1>
           </div>
 
@@ -707,7 +707,7 @@ export default function AdminAffiliatesPage() {
                                 Afiliado
                               </TableHead>
                               <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Cógido do Influencer
+                                Código do Afiliado
                               </TableHead>
                               <TableHead className="text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
                                 % Comissão N1
@@ -803,7 +803,7 @@ export default function AdminAffiliatesPage() {
                     {totalPages > 1 && (
                       <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="text-sm text-gray-400">
-                          Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, affiliates.length)} de {affiliates.length} influencers
+                          Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, affiliates.length)} de {affiliates.length} afiliados
                         </div>
                         <div className="flex items-center space-x-2">
                           <Button

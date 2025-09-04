@@ -153,7 +153,7 @@ export default function FinanceiroPage() {
               value="influencer-payments"
               className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#9FFF00] data-[state=active]:text-[#9FFF00] data-[state=active]:bg-transparent py-3 text-white text-center min-w-0"
             >
-              Pagamentos Influencers
+              Pagamentos Afiliados
             </TabsTrigger>
             <TabsTrigger
               value="simulator"

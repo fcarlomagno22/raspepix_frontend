@@ -42,7 +42,7 @@ export const availablePages: { value: PagePermission; label: string }[] = [
   { value: "portaldosorteado", label: "Portal do Sorteado" },
   { value: "clientes", label: "Clientes" },
   { value: "afiliados", label: "Afiliados" },
-  { value: "influencers", label: "Influencers" },
+  { value: "influencers", label: "Afiliados" },
   { value: "sorteio", label: "Sorteio" },
   { value: "financeiro", label: "Financeiro" },
   { value: "raspadinhas", label: "Raspadinhas" },
