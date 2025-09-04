@@ -386,24 +386,37 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
     }
 
     try {
-      const response = await api.post('/api/saque/solicitar', {
-        valor: amountToWithdraw.toFixed(2),
-        cpf: pixKeyRaw,
-        videoUrl: uploadedVideoUrl
+      const response = await api.post('/api/usuarios/saque', {
+        valor: amountToWithdraw,
+        chave_pix: pixKeyRaw,
+        video_url: uploadedVideoUrl
       })
 
       if (response.data.success) {
+        toast.success(response.data.message || 'Saque solicitado com sucesso!')
         await refetchSaldo() // Atualiza o saldo imediatamente
         onWithdrawSuccess(amountToWithdraw)
         onClose()
-        toast.success('Saque solicitado com sucesso!')
       } else {
         throw new Error(response.data.message || 'Erro ao solicitar saque')
       }
     } catch (error: any) {
       console.error('Erro ao solicitar saque:', error)
-      setWithdrawError(error.response?.data?.message || 'Erro ao solicitar saque. Por favor, tente novamente.')
-      toast.error('Erro ao solicitar saque')
+      
+      // Verificar se é uma mensagem de sucesso que veio como erro
+      const errorMessage = error.response?.data?.message || error.message || 'Erro ao solicitar saque. Por favor, tente novamente.'
+      
+      if (errorMessage.includes('processado com sucesso') || errorMessage.includes('transferido para sua conta')) {
+        // Se a mensagem indica sucesso, tratar como sucesso
+        await refetchSaldo()
+        onWithdrawSuccess(amountToWithdraw)
+        onClose()
+        toast.success(errorMessage)
+      } else {
+        // Caso contrário, tratar como erro
+        setWithdrawError(errorMessage)
+        toast.error('Erro ao solicitar saque')
+      }
     }
   }
 
@@ -411,7 +424,7 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-[#191F26] border-[#1a323a] text-white rounded-xl shadow-xl p-6 w-full max-w-[85vw] md:max-w-md max-h-[85vh] h-full overflow-y-auto flex flex-col">
+      <DialogContent className="bg-[#191F26] border-[#1a323a] text-white rounded-xl shadow-xl p-6 w-full max-w-[85vw] md:max-w-md max-h-[80vh] overflow-y-auto flex flex-col">
         <DialogHeader className="relative">
           {currentStep > 1 && (
             <Button
@@ -443,7 +456,7 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
 
         {/* Passo 1: Valor */}
         {currentStep === 1 && (
-          <div className="mt-6 space-y-5 flex-grow">
+          <div className="mt-6 space-y-5">
             <div className="space-y-2">
               <Label htmlFor="withdraw-amount" className="text-gray-300 text-sm">
                 Valor do Saque
@@ -490,7 +503,7 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
 
         {/* Passo 2: Chave PIX (antigo passo 3) */}
         {currentStep === 2 && (
-          <div className="mt-6 space-y-5 flex-grow">
+          <div className="mt-6 space-y-5">
             <div className="space-y-2">
               <Label htmlFor="pix-key" className="text-gray-300 text-sm">
                 Chave PIX (CPF)
@@ -543,7 +556,7 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
 
         {/* Passo 3: Video Selfie (antigo passo 2) */}
         {currentStep === 3 && (
-          <div className="mt-6 space-y-4 flex-grow flex flex-col items-center justify-center">
+          <div className="mt-6 space-y-4 flex flex-col items-center">
             <p className="text-sm text-gray-400 text-center">
               Grave um vídeo de 5 a 15 segundos agradecendo ou mostrando sua vitória.
             </p>
