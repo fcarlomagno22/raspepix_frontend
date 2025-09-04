@@ -42,20 +42,17 @@ export default function SlotPage() {
 
   const [spinTrigger, setSpinTrigger] = useState(false)
   const [isSpinning, setIsSpinning] = useState(false)
-  const [isFirstSpin, setIsFirstSpin] = useState(true)
+  const [forceWinningPayline, setForceWinningPayline] = useState(false)
+  const [hasValidPrize, setHasValidPrize] = useState(false)
+  const [realPrizeAmount, setRealPrizeAmount] = useState(0)
 
   // REMOVIDO: useEffect que criava new Audio()
 
   const getOutcomeType = useCallback(() => {
-    if (isFirstSpin) {
-      console.log(`[SlotPage] Outcome for first spin: win`)
-      return "win"
-    } else {
-      // A partir da segunda rodada, o resultado será sempre "loss"
-      console.log(`[SlotPage] Outcome for spin ${spinCount}: loss (forced)`)
-      return "loss"
-    }
-  }, [isFirstSpin, spinCount])
+    // O resultado será determinado pela API /api/sorteio/instantaneo
+    // Retorna null para indicar que o resultado será determinado externamente
+    return null
+  }, [])
 
   const startSpin = useCallback(() => {
     if (gameChips <= 0) {
@@ -82,7 +79,11 @@ export default function SlotPage() {
 
       setSpinTrigger(true)
       setIsSpinning(true)
-      setHighlightedCells(null)
+      setHighlightedCells(null) // Limpa highlights no início do giro
+      setShowPrizeModal(false) // Garante que modal não está aberto
+      setHasValidPrize(false) // Reseta estado de prêmio válido
+      setForceWinningPayline(false) // Reseta estado de payline forçada
+      setRealPrizeAmount(0) // Reseta valor do prêmio
       setAnnouncement("Girando...")
 
       // Diminuir o volume da música de fundo e tocar o som de giro
@@ -111,30 +112,51 @@ export default function SlotPage() {
 
   const handleWin = useCallback(
     (winningCells: number[][] | null) => {
-      console.log("[SlotPage] handleWin called with winningCells:", winningCells)
-      if (winningCells && winningCells.length > 0) {
+      console.log("🔍 DEBUG handleWin - Parâmetros:", {
+        winningCells,
+        hasValidPrize,
+        winningCellsLength: winningCells?.length,
+        shouldShowModal: winningCells && winningCells.length > 0 && hasValidPrize
+      });
+      
+      if (winningCells && winningCells.length > 0 && hasValidPrize) {
+        console.log("🎉 EXECUTANDO VITÓRIA - Mostrando modal e payline");
+        // Só mostra modal se há payline vencedora E prêmio válido
         setAnnouncement("Você ganhou!")
         // Reseta o multiplicador após uma vitória
         setCurrentMultiplier(1)
         setChipsSpentSinceLastMultiplierIncrease(0)
         setShowPrizeModal(true)
         setAnnouncement("Você ganhou!")
-        setIsFirstSpin(false) // Define isFirstSpin como false após a primeira vitória
+        // Só destaca células se há prêmio válido
+        setHighlightedCells(winningCells)
       } else {
+        console.log("❌ NÃO EXECUTANDO VITÓRIA - Motivos:", {
+          noWinningCells: !winningCells,
+          noWinningCellsLength: !winningCells?.length,
+          noValidPrize: !hasValidPrize
+        });
+        // Não mostra modal se não há prêmio válido
         setShowPrizeModal(false)
-        setAnnouncement("Não houve vitória nesta rodada.")
+        // NUNCA destaca células se não há prêmio válido
+        setHighlightedCells(null)
+        if (winningCells && winningCells.length > 0) {
+          setAnnouncement("Não houve vitória nesta rodada.")
+        } else {
+          setAnnouncement("Não houve vitória nesta rodada.")
+        }
       }
-      setHighlightedCells(winningCells)
     },
-    [setIsFirstSpin],
+    [hasValidPrize],
   )
 
   const handlePrizeRevealed = useCallback((amount: number) => {
     const finalAmount = amount
 
-    console.log(`[SlotPage] Prêmio revelado: ${finalAmount}. Atualizando saldo...`)
+    console.log(`[SlotPage] 🎉 PRÊMIO REVELADO: R$ ${finalAmount}. Atualizando saldo...`)
     refetchSaldo() // Atualiza o saldo após receber o prêmio
-  }, [])
+    console.log(`[SlotPage] ✅ Saldo atualizado com sucesso!`)
+  }, [refetchSaldo])
 
   const handleSpinEnd = useCallback(() => {
     console.log(`[SlotPage] Spin ended. Total spins completed: ${spinCount}`)
@@ -152,19 +174,54 @@ export default function SlotPage() {
       setBackgroundVolume(originalBackgroundVolumeRef.current)
     }
 
-    // Realizar sorteio instantâneo
+    // Realizar sorteio instantâneo via API
     realizarSorteioInstantaneo()
       .then(resultado => {
-        if (resultado.sucesso) {
-          handleWin([[0, 0], [1, 1], [2, 2]]); // Padrão de vitória diagonal
+        console.log('[SlotPage] Resultado da API de sorteio:', resultado);
+        
+        // A API já retorna sucesso: true quando premiado e sucesso: false quando não premiado
+        // Só considera vitória se a API retornou sucesso: true
+        console.log('🔍 DEBUG VALIDAÇÃO - Verificando resultado:', {
+          sucesso: resultado.sucesso,
+          tipo_sucesso: typeof resultado.sucesso,
+          valor_premio: resultado.valor_premio,
+          numero_sorteado: resultado.numero_sorteado
+        });
+        
+        const temPremioValido = resultado.sucesso === true;
+        console.log('🔍 DEBUG VALIDAÇÃO - temPremioValido:', temPremioValido);
+        
+        if (temPremioValido) {
+          console.log('[SlotPage] ✅ USUÁRIO GANHOU! API retornou sucesso: true', {
+            valor_premio: resultado.valor_premio,
+            numero_sorteado: resultado.numero_sorteado
+          });
+          // Se a API retornou sucesso: true, força payline vencedora
+          setForceWinningPayline(true);
+          setHasValidPrize(true);
+          setRealPrizeAmount(resultado.valor_premio || 0);
+          handleWin([[0, 0], [1, 1], [2, 2]]);
           handlePrizeRevealed(resultado.valor_premio || 0);
         } else {
-          handleWin(null); // Sem vitória
+          console.log('[SlotPage] ❌ USUÁRIO NÃO GANHOU. API retornou sucesso: false', {
+            sucesso: resultado.sucesso,
+            valor_premio: resultado.valor_premio,
+            numero_sorteado: resultado.numero_sorteado
+          });
+          // Se a API retornou sucesso: false, não força payline
+          setForceWinningPayline(false);
+          setHasValidPrize(false);
+          setRealPrizeAmount(0);
+          handleWin(null);
         }
       })
       .catch(error => {
         console.error('Erro ao realizar sorteio:', error);
-        handleWin(null); // Em caso de erro, não há vitória
+        // Em caso de erro, não força payline e não há vitória
+        setForceWinningPayline(false);
+        setHasValidPrize(false);
+        setRealPrizeAmount(0);
+        handleWin(null);
       });
 
   }, [spinCount, backgroundAudioRef, setBackgroundVolume, handleWin, handlePrizeRevealed])
@@ -347,6 +404,7 @@ export default function SlotPage() {
           highlightedCells={highlightedCells}
           spinCount={spinCount}
           currentMultiplier={currentMultiplier}
+          forceWinningPayline={forceWinningPayline}
         />
       </div>
 
@@ -420,6 +478,7 @@ export default function SlotPage() {
         isOpen={showPrizeModal}
         onClose={handlePrizeModalClose}
         onPrizeRevealed={handlePrizeRevealed}
+        prizeAmount={realPrizeAmount}
       />
 
       {/* Insufficient Chances Modal */}

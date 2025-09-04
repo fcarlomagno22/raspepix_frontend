@@ -11,6 +11,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { ArrowLeft, Camera, Video, RefreshCcw, Send } from "lucide-react"
 import { formatCPF, formatCurrency } from "@/lib/utils"
 import { useCarteiraPremios } from "@/hooks/use-carteira-premios"
+import { useUserProfile } from "@/hooks/use-user-profile"
 import { api } from "@/services/api"
 import { toast } from "sonner"
 
@@ -27,6 +28,7 @@ const MAX_VIDEO_SIZE = 50 * 1024 * 1024 // 50MB em bytes
 
 export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: WithdrawModalProps) {
   const { saldo: currentSaldoSacavel, isLoading: isLoadingSaldo, refetch: refetchSaldo } = useCarteiraPremios()
+  const { profile: userProfile, loading: isLoadingProfile } = useUserProfile()
   const [currentStep, setCurrentStep] = useState(1)
   const [withdrawAmountDisplay, setWithdrawAmountDisplay] = useState("")
   const [withdrawAmountCents, setWithdrawAmountCents] = useState<number | null>(null)
@@ -348,9 +350,15 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
         return
       }
     } else if (currentStep === 2) {
-      // Now PIX Key step
+      // Validação da chave PIX (CPF)
       if (pixKeyRaw.length !== 11) {
         setWithdrawError("Por favor, insira um CPF válido com 11 dígitos.")
+        return
+      }
+      
+      // Verifica se o CPF informado é o mesmo do cadastro do usuário
+      if (userProfile && pixKeyRaw !== userProfile.cpf) {
+        setWithdrawError("O CPF informado deve ser o mesmo do seu cadastro. Por favor, verifique e tente novamente.")
         return
       }
     } else if (currentStep === 3) {
@@ -495,8 +503,25 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
                 onChange={handlePixKeyChange}
                 maxLength={14}
                 className="bg-[#1a323a] border-[#1a323a] focus:border-[#9ffe00] focus:ring-[#9ffe00] text-white h-10 text-base"
+                disabled={isLoadingProfile}
               />
-              <p className="text-xs text-gray-500">A chave PIX deve ser o CPF do titular da conta.</p>
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500">A chave PIX deve ser o CPF do titular da conta.</p>
+                {isLoadingProfile ? (
+                  <p className="text-xs text-gray-400">Carregando dados do usuário...</p>
+                ) : userProfile ? (
+                  <p className="text-xs text-[#9ffe00] font-medium">
+                    Seu CPF cadastrado: {userProfile.document}
+                  </p>
+                ) : (
+                  <p className="text-xs text-red-400">
+                    Erro ao carregar dados do usuário. Tente novamente.
+                  </p>
+                )}
+                <p className="text-xs text-yellow-400">
+                  ⚠️ O CPF informado deve ser exatamente o mesmo do seu cadastro.
+                </p>
+              </div>
             </div>
             <div className="bg-[#1a323a] p-3 rounded-lg space-y-1 border border-[#9ffe00]/20">
               <h3 className="text-base font-bold text-[#9ffe00]">Resumo do Saque</h3>
@@ -509,9 +534,9 @@ export default function WithdrawModal({ isOpen, onClose, onWithdrawSuccess }: Wi
             <Button
               onClick={handleNextStep}
               className="w-full bg-[#9ffe00] hover:bg-[#9ffe00]/90 text-[#191F26] font-medium transition-all duration-300 shadow-glow-sm hover:shadow-glow h-10 text-base"
-              disabled={pixKeyRaw.length !== 11}
+              disabled={pixKeyRaw.length !== 11 || isLoadingProfile || !userProfile}
             >
-              Continuar
+              {isLoadingProfile ? "Carregando..." : "Continuar"}
             </Button>
           </div>
         )}

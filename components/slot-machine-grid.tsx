@@ -22,10 +22,11 @@ interface SlotMachineGridProps {
   triggerSpin: boolean
   onSpinEnd: () => void
   onWin: (winningCells: number[][] | null) => void
-  outcomeType: "win" | "loss" | "random"
+  outcomeType: "win" | "loss" | "random" | null
   highlightedCells: number[][] | null
   spinCount: number
   currentMultiplier: number // Nova prop para o multiplicador
+  forceWinningPayline: boolean // Nova prop para forçar payline vencedora
 }
 
 // Destructure a nova prop currentMultiplier na função SlotMachineGrid
@@ -37,6 +38,7 @@ export function SlotMachineGrid({
   highlightedCells,
   spinCount,
   currentMultiplier, // Desestruture a nova prop
+  forceWinningPayline, // Desestruture a nova prop
 }: SlotMachineGridProps) {
   const [reels, setReels] = useState<string[][]>(() =>
     Array(3)
@@ -72,49 +74,122 @@ export function SlotMachineGrid({
         return null
       }
 
-      // Verifica a primeira linha (row 0)
-      if (symbols[0][0] === symbols[1][0] && symbols[1][0] === symbols[2][0]) {
-        return {
-          type: "row",
-          positions: [
-            [0, 0],
-            [1, 0],
-            [2, 0],
-          ],
-        }
-      }
-      // Verifica a terceira linha (row 2)
-      if (symbols[0][2] === symbols[1][2] && symbols[1][2] === symbols[2][2]) {
-        return {
-          type: "row",
-          positions: [
-            [0, 2],
-            [1, 2],
-            [2, 2],
-          ],
+      // Verifica linhas horizontais considerando coringa
+      for (let row = 0; row < 3; row++) {
+        const elements = [symbols[0][row], symbols[1][row], symbols[2][row]]
+        const hasJoker = elements[1] === "VIDEO_CORINGA"
+        
+        if (hasJoker) {
+          // Se tem coringa no centro, verifica se os outros dois são iguais
+          if (elements[0] === elements[2]) {
+            return {
+              type: "row",
+              positions: [
+                [0, row],
+                [1, row],
+                [2, row],
+              ],
+            }
+          }
+        } else {
+          // Se não tem coringa, verifica se todos são iguais
+          if (elements[0] === elements[1] && elements[1] === elements[2]) {
+            return {
+              type: "row",
+              positions: [
+                [0, row],
+                [1, row],
+                [2, row],
+              ],
+            }
+          }
         }
       }
 
-      // Verifica a primeira coluna (col 0)
-      if (symbols[0][0] === symbols[0][1] && symbols[0][1] === symbols[0][2]) {
-        return {
-          type: "col",
-          positions: [
-            [0, 0],
-            [0, 1],
-            [0, 2],
-          ],
+      // Verifica colunas verticais considerando coringa
+      for (let col = 0; col < 3; col++) {
+        const elements = [symbols[col][0], symbols[col][1], symbols[col][2]]
+        const hasJoker = elements[1] === "VIDEO_CORINGA"
+        
+        if (hasJoker) {
+          // Se tem coringa no centro, verifica se os outros dois são iguais
+          if (elements[0] === elements[2]) {
+            return {
+              type: "col",
+              positions: [
+                [col, 0],
+                [col, 1],
+                [col, 2],
+              ],
+            }
+          }
+        } else {
+          // Se não tem coringa, verifica se todos são iguais
+          if (elements[0] === elements[1] && elements[1] === elements[2]) {
+            return {
+              type: "col",
+              positions: [
+                [col, 0],
+                [col, 1],
+                [col, 2],
+              ],
+            }
+          }
         }
       }
-      // Verifica a terceira coluna (col 2)
-      if (symbols[2][0] === symbols[2][1] && symbols[2][1] === symbols[2][2]) {
-        return {
-          type: "col",
-          positions: [
-            [2, 0],
-            [2, 1],
-            [2, 2],
-          ],
+
+      // Verifica diagonais considerando coringa
+      // Diagonal principal: [0,0], [1,1], [2,2]
+      const diagonal1 = [symbols[0][0], symbols[1][1], symbols[2][2]]
+      const hasJokerDiagonal1 = diagonal1[1] === "VIDEO_CORINGA"
+      if (hasJokerDiagonal1) {
+        if (diagonal1[0] === diagonal1[2]) {
+          return {
+            type: "diagonal",
+            positions: [
+              [0, 0],
+              [1, 1],
+              [2, 2],
+            ],
+          }
+        }
+      } else {
+        if (diagonal1[0] === diagonal1[1] && diagonal1[1] === diagonal1[2]) {
+          return {
+            type: "diagonal",
+            positions: [
+              [0, 0],
+              [1, 1],
+              [2, 2],
+            ],
+          }
+        }
+      }
+
+      // Diagonal secundária: [0,2], [1,1], [2,0]
+      const diagonal2 = [symbols[0][2], symbols[1][1], symbols[2][0]]
+      const hasJokerDiagonal2 = diagonal2[1] === "VIDEO_CORINGA"
+      if (hasJokerDiagonal2) {
+        if (diagonal2[0] === diagonal2[2]) {
+          return {
+            type: "diagonal",
+            positions: [
+              [0, 2],
+              [1, 1],
+              [2, 0],
+            ],
+          }
+        }
+      } else {
+        if (diagonal2[0] === diagonal2[1] && diagonal2[1] === diagonal2[2]) {
+          return {
+            type: "diagonal",
+            positions: [
+              [0, 2],
+              [1, 1],
+              [2, 0],
+            ],
+          }
         }
       }
 
@@ -123,13 +198,91 @@ export function SlotMachineGrid({
     [],
   )
 
+  // Função para verificar paylines considerando o vídeo central como coringa
+  const checkForWinningPaylinesWithJoker = useCallback((symbols: string[][]): boolean => {
+    if (!symbols || symbols.length !== 3 || !symbols.every((col) => col.length === 3)) {
+      return false
+    }
+
+    // Verifica linhas horizontais
+    for (let row = 0; row < 3; row++) {
+      const elements = [symbols[0][row], symbols[1][row], symbols[2][row]]
+      const hasJoker = elements[1] === "VIDEO_CORINGA" // Vídeo central é coringa
+      
+      if (hasJoker) {
+        // Se tem coringa no centro, verifica se os outros dois são iguais
+        if (elements[0] === elements[2]) {
+          return true
+        }
+      } else {
+        // Se não tem coringa, verifica se todos são iguais
+        if (elements[0] === elements[1] && elements[1] === elements[2]) {
+          return true
+        }
+      }
+    }
+
+    // Verifica colunas verticais
+    for (let col = 0; col < 3; col++) {
+      const elements = [symbols[col][0], symbols[col][1], symbols[col][2]]
+      const hasJoker = elements[1] === "VIDEO_CORINGA" // Vídeo central é coringa
+      
+      if (hasJoker) {
+        // Se tem coringa no centro, verifica se os outros dois são iguais
+        if (elements[0] === elements[2]) {
+          return true
+        }
+      } else {
+        // Se não tem coringa, verifica se todos são iguais
+        if (elements[0] === elements[1] && elements[1] === elements[2]) {
+          return true
+        }
+      }
+    }
+
+    // Verifica diagonais
+    // Diagonal principal: [0,0], [1,1], [2,2]
+    const diagonal1 = [symbols[0][0], symbols[1][1], symbols[2][2]]
+    const hasJokerDiagonal1 = diagonal1[1] === "VIDEO_CORINGA"
+    if (hasJokerDiagonal1) {
+      if (diagonal1[0] === diagonal1[2]) {
+        return true
+      }
+    } else {
+      if (diagonal1[0] === diagonal1[1] && diagonal1[1] === diagonal1[2]) {
+        return true
+      }
+    }
+
+    // Diagonal secundária: [0,2], [1,1], [2,0]
+    const diagonal2 = [symbols[0][2], symbols[1][1], symbols[2][0]]
+    const hasJokerDiagonal2 = diagonal2[1] === "VIDEO_CORINGA"
+    if (hasJokerDiagonal2) {
+      if (diagonal2[0] === diagonal2[2]) {
+        return true
+      }
+    } else {
+      if (diagonal2[0] === diagonal2[1] && diagonal2[1] === diagonal2[2]) {
+        return true
+      }
+    }
+
+    return false
+  }, [])
+
   const generateRandomReels = useCallback((): string[][] => {
     return Array(3)
       .fill(null)
-      .map(() =>
+      .map((_, colIndex) =>
         Array(3)
           .fill(null)
-          .map(() => slotElements[Math.floor(Math.random() * slotElements.length)]),
+          .map((_, rowIndex) => {
+            // Posição central (1,1) sempre é o vídeo coringa
+            if (colIndex === 1 && rowIndex === 1) {
+              return "VIDEO_CORINGA"
+            }
+            return slotElements[Math.floor(Math.random() * slotElements.length)]
+          }),
       )
   }, [])
 
@@ -156,6 +309,7 @@ export function SlotMachineGrid({
       newReels[2][0] = winningElement
     }
 
+    // Preenche as posições vazias com elementos diferentes
     for (let col = 0; col < 3; col++) {
       for (let row = 0; row < 3; row++) {
         if (newReels[col][row] === "") {
@@ -167,21 +321,44 @@ export function SlotMachineGrid({
         }
       }
     }
+
+    // Garante que a posição central seja o vídeo coringa
+    newReels[1][1] = "VIDEO_CORINGA"
+
     console.log("[SlotMachineGrid] Generated WINNING reels:", JSON.parse(JSON.stringify(newReels)))
     return newReels
   }, [])
 
   const generateLosingReels = useCallback((): string[][] => {
-    let newReels
+    let newReels: string[][]
     let attempts = 0
+    const maxAttempts = 200 // Aumentado para garantir que encontre uma configuração válida
+    
     do {
       newReels = generateRandomReels()
       attempts++
-    } while (getWinningPositions(newReels) && attempts < 100)
-    if (attempts >= 100) console.warn("[SlotMachineGrid] Max attempts reached for losing reels.")
+      
+      // Verifica se há paylines vencedoras considerando o vídeo central como coringa
+      const hasWinningPayline = checkForWinningPaylinesWithJoker(newReels)
+      
+      if (!hasWinningPayline) {
+        break // Encontrou uma configuração sem paylines vencedoras
+      }
+    } while (attempts < maxAttempts)
+    
+    if (attempts >= maxAttempts) {
+      console.warn("[SlotMachineGrid] Max attempts reached for losing reels. Using fallback configuration.")
+      // Fallback: configuração manual que garante não ter paylines
+      newReels = [
+        [slotElements[0], slotElements[1], slotElements[2]],
+        [slotElements[3], "VIDEO_CORINGA", slotElements[4]], // Vídeo central como coringa
+        [slotElements[5], slotElements[6], slotElements[7]]
+      ]
+    }
+    
     console.log("[SlotMachineGrid] Generated LOSING reels:", JSON.parse(JSON.stringify(newReels)))
     return newReels
-  }, [generateRandomReels, getWinningPositions])
+  }, [generateRandomReels])
 
   useEffect(() => {
     if (triggerSpin) {
@@ -205,12 +382,13 @@ export function SlotMachineGrid({
       console.log(`[SlotMachineGrid] Outcome for this spin (spin ${spinCount}): ${currentOutcome}`)
 
       let finalReelsConfig: string[][]
-      if (currentOutcome === "win") {
+      if (currentOutcome === "win" || forceWinningPayline) {
+        // Se outcomeType for "win" ou se forceWinningPayline for true, gera reels vencedores
         finalReelsConfig = generateWinningReels()
-      } else if (currentOutcome === "loss") {
-        finalReelsConfig = generateLosingReels()
       } else {
-        finalReelsConfig = generateRandomReels()
+        // Para todos os outros casos (loss, null, etc.), gera reels perdedores
+        // Isso garante que NUNCA haverá paylines quando não for premiado
+        finalReelsConfig = generateLosingReels()
       }
       predeterminedFinalReelsRef.current = JSON.parse(JSON.stringify(finalReelsConfig)) // Deep copy
       console.log(
@@ -219,7 +397,7 @@ export function SlotMachineGrid({
       )
 
       // Lógica para vibração de pré-vitória (real)
-      if (currentOutcome === "win") {
+      if (currentOutcome === "win" || forceWinningPayline) {
         preWinVibrationStartTimeoutRef.current = setTimeout(() => {
           setIsPreWinVibrating(true)
           preWinVibrationEndTimeoutRef.current = setTimeout(() => {
@@ -227,8 +405,8 @@ export function SlotMachineGrid({
           }, 1500) // Vibra por 1.5 segundos
         }, 500) // Começa a vibrar 0.5 segundos após o início do giro
       }
-      // Lógica para vibração de falsa pré-vitória
-      else if (Math.random() < 0.3) {
+      // Lógica para vibração de falsa pré-vitória (apenas quando não é vitória garantida)
+      else if (currentOutcome !== "win" && !forceWinningPayline && Math.random() < 0.3) {
         // 30% de chance de falsa pré-vitória em giros não-vencedores
         falsePreWinVibrationStartTimeoutRef.current = setTimeout(() => {
           setIsFalsePreWinVibrating(true)
@@ -289,11 +467,21 @@ export function SlotMachineGrid({
               "[SlotMachineGrid] Last reel stopped. Checking win condition against:",
               JSON.parse(JSON.stringify(predeterminedFinalReelsRef.current)),
             )
-            const winResult = predeterminedFinalReelsRef.current
-              ? getWinningPositions(predeterminedFinalReelsRef.current)
-              : null
-            console.log("[SlotMachineGrid] Win result from getWinningPositions:", winResult)
-            onWin(winResult ? winResult.positions : null)
+            
+            // Só verifica vitória se forceWinningPayline for true
+            console.log("🔍 DEBUG SlotMachineGrid - forceWinningPayline:", forceWinningPayline);
+            
+            if (forceWinningPayline) {
+              const winResult = predeterminedFinalReelsRef.current
+                ? getWinningPositions(predeterminedFinalReelsRef.current)
+                : null
+              console.log("🎯 SlotMachineGrid - ForceWinningPayline=true, Win result:", winResult)
+              onWin(winResult ? winResult.positions : null)
+            } else {
+              // Se não deve forçar payline, nunca há vitória
+              console.log("❌ SlotMachineGrid - ForceWinningPayline=false - no win, no highlight")
+              onWin(null)
+            }
             onSpinEnd()
           }
         }, stopDelays[reelIndex])
@@ -311,6 +499,7 @@ export function SlotMachineGrid({
     triggerSpin,
     spinCount,
     outcomeType,
+    forceWinningPayline,
     generateWinningReels,
     generateLosingReels,
     generateRandomReels,

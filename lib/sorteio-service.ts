@@ -12,8 +12,27 @@ export async function sortearNumero() {
 export async function realizarSorteioInstantaneo() {
   try {
     const response = await api.post('/api/sorteio/instantaneo');
+    console.log('Resposta da API de sorteio:', response.data);
+    
+    // Verifica se a resposta tem a estrutura esperada
+    if (!response.data || typeof response.data.valor_premio === 'undefined') {
+      console.warn('Formato de resposta inválido da API de sorteio:', response.data);
+      return {
+        sucesso: false,
+        valor_premio: 0,
+        numero_sorteado: null
+      };
+    }
+    
+    console.log('🔍 DEBUG API - Campos da resposta:', {
+      sucesso: response.data.sucesso,
+      valor_premio: response.data.valor_premio,
+      numero_sorteado: response.data.numero_sorteado,
+      tipo_sucesso: typeof response.data.sucesso
+    });
+    
     return {
-      sucesso: true,
+      sucesso: response.data.sucesso,
       valor_premio: response.data.valor_premio,
       numero_sorteado: response.data.numero_sorteado
     };

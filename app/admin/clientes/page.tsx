@@ -2,29 +2,12 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AdminSidebar from "@/components/admin/admin-sidebar"
 import AdminHeaderMobile from "@/components/admin/admin-header-mobile"
-import OverviewKPIs from "@/components/admin/overview-kpis"
 import UserTable from "@/components/admin/user-table"
-import NewUsersChart from "@/components/admin/new-users-chart"
-import HourlyRegistrationsChart from "@/components/admin/hourly-registrations-chart"
 
 
 
-
-const mockKPIs = {
-  totalUsers: 15420,
-  newUsers: 1250,
-  activeUsers: 8900,
-  totalTokensGenerated: 125000,
-  totalTokensUsed: 98500,
-  activeTokensPercentage: 68.5,
-  averageTicket: 45.8,
-  prizeWinnersPercentage: 12.3,
-  totalPrizesDistributed: 87500.0,
-  withdrawalPercentage: 34.7,
-}
 
 const mockUsers = [
   {
@@ -71,27 +54,6 @@ const mockUsers = [
   }
 ]
 
-// Mock data para os gráficos
-const mockNewUsersData = [
-  { date: "Jan", newUsers: 120 },
-  { date: "Fev", newUsers: 150 },
-  { date: "Mar", newUsers: 180 },
-  { date: "Abr", newUsers: 200 },
-  { date: "Mai", newUsers: 250 },
-  { date: "Jun", newUsers: 300 },
-]
-
-const mockHourlyRegistrationsData = [
-  { time: "00h-03h", registrations: 80 },
-  { time: "03h-06h", registrations: 50 },
-  { time: "06h-09h", registrations: 120 },
-  { time: "09h-12h", registrations: 250 },
-  { time: "12h-15h", registrations: 350 },
-  { time: "15h-18h", registrations: 400 },
-  { time: "18h-21h", registrations: 300 },
-  { time: "21h-00h", registrations: 200 },
-]
-
 const SESSION_TIMEOUT_SECONDS = 3 * 60 // 3 minutes
 const WARNING_THRESHOLD_SECONDS = 60 // 1 minute
 
@@ -102,7 +64,6 @@ export default function AdminClientesPage() {
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [showSessionWarning, setShowSessionWarning] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<"overview" | "users">("overview")
 
 
   const resetSessionTimer = () => {
@@ -171,43 +132,8 @@ export default function AdminClientesPage() {
           </div>
         </section>
 
-        {/* Sistema de Abas (Estilo atualizado) */}
-        <Tabs
-          defaultValue="overview"
-          className="w-full"
-          onValueChange={(value: string) => setActiveTab(value as "overview" | "users")}
-        >
-          <TabsList className="grid w-full grid-cols-2 bg-[#1A2430] border border-[#9FFF00]/20">
-            <TabsTrigger
-              value="overview"
-              className="data-[state=active]:bg-[#9FFF00] data-[state=active]:text-black text-gray-300"
-            >
-              Visão Geral
-            </TabsTrigger>
-            <TabsTrigger
-              value="users"
-              className="data-[state=active]:bg-[#9FFF00] data-[state=active]:text-black text-gray-300"
-            >
-              Usuários
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
-            <OverviewKPIs {...mockKPIs} />
-            <div className="my-8"></div> {/* Espaçamento */}
-            {/* Gráficos de Clientes */}
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <NewUsersChart data={mockNewUsersData} />
-              <HourlyRegistrationsChart data={mockHourlyRegistrationsData} />
-            </section>
-          </TabsContent>
-
-          <TabsContent value="users">
-            <UserTable initialUsers={mockUsers} />
-          </TabsContent>
-
-
-        </Tabs>
+        {/* Tabela de Usuários */}
+        <UserTable initialUsers={mockUsers} />
       </main>
     </div>
   )
