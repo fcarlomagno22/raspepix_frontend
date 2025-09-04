@@ -13,7 +13,18 @@ const fetchSaldoPremios = async (): Promise<CarteiraPremiosResponse> => {
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar saldo de prêmios:', error);
+    
+    // Verifica se é um erro 500 (Internal Server Error) ou se a mensagem contém "Erro interno do servidor"
     const errorMessage = getErrorMessage(error);
+    const isServerError = error?.response?.status === 500 || errorMessage.includes('Erro interno do servidor');
+    
+    if (isServerError) {
+      // Para erro 500, não exibe toast de erro, apenas loga no console
+      console.warn('Erro 500 ao buscar saldo de prêmios - não exibindo toast de erro');
+      throw error;
+    }
+    
+    // Para outros tipos de erro, exibe o toast normalmente
     toast.error(`Não foi possível carregar o saldo de prêmios: ${errorMessage}`);
     throw error;
   }

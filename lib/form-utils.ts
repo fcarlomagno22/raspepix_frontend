@@ -85,6 +85,17 @@ export const validateEmail = (email: string): boolean => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+export const validateFullName = (fullName: string): boolean => {
+  if (!fullName || fullName.trim().length === 0) return false
+  
+  const trimmedName = fullName.trim()
+  const nameParts = trimmedName.split(/\s+/)
+  
+  // Deve ter pelo menos 2 partes (nome + sobrenome)
+  // Cada parte deve ter pelo menos 2 caracteres
+  return nameParts.length >= 2 && nameParts.every(part => part.length >= 2)
+}
+
 // --- Stub de formatação de CPF ---
 // Para manter compatibilidade com importações antigas.
 export const formatCPF = (value: string) => maskCPF(value)

@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -19,10 +19,12 @@ import {
   validateAge,
   validatePassword,
   validateEmail,
+  validateFullName,
 } from "@/lib/form-utils"
 import { cn } from "@/lib/utils" // Assuming cn is available for conditional class names
 import { api } from '@/services/api';
 import Cookies from 'js-cookie';
+import { useDebounce } from '@/hooks/use-debounce';
 
 interface FormData {
   cpf: string
@@ -122,7 +124,68 @@ export default function RegistrationForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null);
+  const [ageValidation, setAgeValidation] = useState<{
+    isValid: boolean | null;
+    message: string;
+  }>({ isValid: null, message: '' });
+  const [cpfValidation, setCpfValidation] = useState<{
+    isValid: boolean | null;
+    message: string;
+  }>({ isValid: null, message: '' });
+  const [emailValidation, setEmailValidation] = useState<{
+    isValid: boolean | null;
+    message: string;
+  }>({ isValid: null, message: '' });
+  
+  // Debounce para CPF, email e data de nascimento
+  const debouncedCpf = useDebounce(formData.cpf, 500);
+  const debouncedEmail = useDebounce(formData.email, 500);
+  const debouncedDob = useDebounce(formData.dob, 500);
 
+  // Validar CPF quando o valor debounced mudar
+  useEffect(() => {
+    if (debouncedCpf && debouncedCpf.length === 14) { // 14 caracteres com máscara
+      const cleanedCpf = debouncedCpf.replace(/\D/g, '');
+      if (validateCPF(cleanedCpf)) {
+        setCpfValidation({ isValid: true, message: 'CPF válido' });
+      } else {
+        setCpfValidation({ isValid: false, message: 'CPF inválido' });
+      }
+    } else if (debouncedCpf && debouncedCpf.length > 0) {
+      setCpfValidation({ isValid: false, message: 'CPF incompleto' });
+    } else {
+      setCpfValidation({ isValid: null, message: '' });
+    }
+  }, [debouncedCpf]);
+
+  // Validar email quando o valor debounced mudar
+  useEffect(() => {
+    if (debouncedEmail && debouncedEmail.length > 0) {
+      if (validateEmail(debouncedEmail)) {
+        setEmailValidation({ isValid: true, message: 'E-mail válido' });
+      } else {
+        setEmailValidation({ isValid: false, message: 'E-mail inválido' });
+      }
+    } else {
+      setEmailValidation({ isValid: null, message: '' });
+    }
+  }, [debouncedEmail]);
+
+  // Validar idade quando a data de nascimento mudar
+  useEffect(() => {
+    if (debouncedDob && debouncedDob.length === 10) {
+      const isValidAge = validateAge(debouncedDob);
+      if (isValidAge) {
+        setAgeValidation({ isValid: true, message: 'Idade válida' });
+      } else {
+        setAgeValidation({ isValid: false, message: 'Você deve ter entre 16 e 100 anos' });
+      }
+    } else if (debouncedDob && debouncedDob.length > 0) {
+      setAgeValidation({ isValid: false, message: 'Data de nascimento inválida' });
+    } else {
+      setAgeValidation({ isValid: null, message: '' });
+    }
+  }, [debouncedDob]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -181,9 +244,12 @@ export default function RegistrationForm() {
       if (!formData.fullName.trim()) {
         newErrors.fullName = "Nome completo é obrigatório."
         isValid = false
+      } else if (!validateFullName(formData.fullName)) {
+        newErrors.fullName = "Digite seu nome completo (nome e sobrenome)."
+        isValid = false
       }
       if (!formData.dob || !validateAge(formData.dob)) {
-        newErrors.dob = "Data de nascimento inválida. Você deve ter entre 16 e 100 anos."
+        newErrors.dob = ageValidation.message || "Data de nascimento inválida. Você deve ter entre 16 e 100 anos."
         isValid = false
       }
       if (!formData.gender) {
@@ -263,7 +329,10 @@ export default function RegistrationForm() {
       router.replace('/login?registered=true');
     } catch (error: any) {
       console.error('Erro no registro:', error);
-      setError(error.response?.data?.message || 'Erro ao criar conta. Tente novamente.');
+      
+      // Usar a mensagem do erro diretamente (já tratada pelo interceptor)
+      const errorMessage = error.message || 'Erro ao criar conta. Tente novamente.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -324,11 +393,23 @@ export default function RegistrationForm() {
                 className={cn(
                   "bg-gray-800 border-gray-700 text-white focus:ring-primary focus:border-primary",
                   errors.cpf && "border-red-500",
+                  cpfValidation.isValid === true && formData.cpf && !errors.cpf && "border-green-500",
+                  cpfValidation.isValid === false && formData.cpf && "border-red-500",
                 )}
               />
               {errors.cpf && (
                 <p className="text-red-500 text-sm mt-1" aria-live="polite">
                   {errors.cpf}
+                </p>
+              )}
+              {cpfValidation.isValid === true && formData.cpf && !errors.cpf && (
+                <p className="text-green-500 text-sm mt-1" aria-live="polite">
+                  ✓ {cpfValidation.message}
+                </p>
+              )}
+              {cpfValidation.isValid === false && formData.cpf && !errors.cpf && (
+                <p className="text-red-500 text-sm mt-1" aria-live="polite">
+                  {cpfValidation.message}
                 </p>
               )}
             </div>
@@ -383,6 +464,9 @@ export default function RegistrationForm() {
             <div>
               <Label htmlFor="dob" className="text-white">
                 Data de Nascimento
+                {formData.dob && formData.dob.length === 10 && ageValidation.isValid === null && (
+                  <span className="ml-2 text-yellow-400 text-sm">Verificando...</span>
+                )}
               </Label>
               <Input
                 id="dob"
@@ -394,9 +478,21 @@ export default function RegistrationForm() {
                 className={cn(
                   "bg-gray-800 border-gray-700 text-white focus:ring-primary focus:border-primary",
                   errors.dob && "border-red-500",
+                  ageValidation.isValid === true && formData.dob && !errors.dob && "border-green-500",
+                  ageValidation.isValid === false && formData.dob && "border-red-500",
                 )}
               />
               {errors.dob && <p className="text-red-500 text-sm mt-1">{errors.dob}</p>}
+              {ageValidation.isValid === true && formData.dob && !errors.dob && (
+                <p className="text-green-500 text-sm mt-1" aria-live="polite">
+                  ✓ {ageValidation.message}
+                </p>
+              )}
+              {ageValidation.isValid === false && formData.dob && (
+                <p className="text-red-500 text-sm mt-1" aria-live="polite">
+                  {ageValidation.message}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="gender" className="text-white">
@@ -451,9 +547,21 @@ export default function RegistrationForm() {
                 className={cn(
                   "bg-gray-800 border-gray-700 text-white focus:ring-primary focus:border-primary",
                   errors.email && "border-red-500",
+                  emailValidation.isValid === true && formData.email && !errors.email && "border-green-500",
+                  emailValidation.isValid === false && formData.email && "border-red-500",
                 )}
               />
               {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              {emailValidation.isValid === true && formData.email && !errors.email && (
+                <p className="text-green-500 text-sm mt-1" aria-live="polite">
+                  ✓ {emailValidation.message}
+                </p>
+              )}
+              {emailValidation.isValid === false && formData.email && !errors.email && (
+                <p className="text-red-500 text-sm mt-1" aria-live="polite">
+                  {emailValidation.message}
+                </p>
+              )}
             </div>
           </motion.div>
         )

@@ -84,6 +84,12 @@ api.interceptors.response.use(
       error: error.message
     });
 
+    // Tratamento para erros de validação (400)
+    if (error.response?.status === 400) {
+      const message = error.response.data?.message || error.response.data?.error || 'Dados inválidos';
+      return Promise.reject(new Error(message));
+    }
+
     // Tratamento para usuário bloqueado
     if (error.response?.status === 403) {
       return Promise.reject(new Error(error.response.data.message || 'Sua conta está bloqueada. Entre em contato conosco.'));
@@ -112,6 +118,10 @@ api.interceptors.response.use(
 
     // Se houver uma mensagem de erro específica da API
     if (error.response?.data?.error) {
+      // Para erro 500 no endpoint de saldo de prêmios, não retorna a mensagem de erro
+      if (error.response?.status === 500 && error.config?.url?.includes('/api/carteira/premios/saldo')) {
+        return Promise.reject(new Error('Erro interno do servidor'));
+      }
       return Promise.reject(new Error(error.response.data.error));
     }
 
