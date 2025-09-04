@@ -581,6 +581,31 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
 
   const isEndDateDisabled = edition?.status === "ativo"
 
+  // Validação para habilitar o botão "Criar Edição"
+  const isFormValid = useMemo(() => {
+    const values = form.getValues()
+    
+    // Verificar se todos os campos obrigatórios estão preenchidos
+    const hasRequiredFields = values.name && 
+                             values.susepProcess && 
+                             values.editionNumber && 
+                             values.lotteryPrize > 0 && 
+                             values.startDate && 
+                             values.endDate &&
+                             values.totalInstantTicketsToCreate > 0 &&
+                             values.numInstantPrizesToDistribute > 0 &&
+                             values.minInstantPrizeValue > 0 &&
+                             values.maxInstantPrizeValue > 0
+
+    // Verificar se o arquivo foi carregado na Modalidade Incentivo
+    const hasInstantPrizesFile = !!importedInstantPrizesFileContent
+
+    // Verificar se a grade de números da filantropia foi gerada
+    const hasCapitalizadoraNumbers = generatedCapitalizadoraNumbers.length > 0
+
+    return hasRequiredFields && hasInstantPrizesFile && hasCapitalizadoraNumbers
+  }, [form.watch(), importedInstantPrizesFileContent, generatedCapitalizadoraNumbers])
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[90vw] max-w-[90vw] max-h-[90vh] flex flex-col bg-[#0D1117] text-white border-[#9FFF00]/10 p-6">
@@ -1098,22 +1123,42 @@ export default function LotteryEditionModal({ isOpen, onClose, edition, onSave }
 
         </form>
         <DialogFooter className="mt-auto p-4 border-t border-[#232A34] bg-[#0D1117]">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-[#9FFF00]/10"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={isSubmitting}
-            className="bg-[#9FFF00] text-black hover:bg-lime-400 font-semibold"
-          >
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {edition ? "Salvar Alterações" : "Criar Edição"}
-          </Button>
+          {!isFormValid && !edition && (
+            <div className="flex-1 text-sm text-gray-400 mb-2">
+              <p className="font-medium text-[#9FFF00] mb-1">Para criar a edição, complete:</p>
+              <ul className="list-disc list-inside space-y-1">
+                {!form.getValues().name && <li>Nome da edição</li>}
+                {!form.getValues().susepProcess && <li>Processo Susep</li>}
+                {form.getValues().lotteryPrize <= 0 && <li>Valor do prêmio da filantropia</li>}
+                {!form.getValues().startDate && <li>Data de início</li>}
+                {!form.getValues().endDate && <li>Data de encerramento</li>}
+                {form.getValues().totalInstantTicketsToCreate <= 0 && <li>Total de títulos instantâneos</li>}
+                {form.getValues().numInstantPrizesToDistribute <= 0 && <li>Quantidade de prêmios a distribuir</li>}
+                {form.getValues().minInstantPrizeValue <= 0 && <li>Valor mínimo do prêmio</li>}
+                {form.getValues().maxInstantPrizeValue <= 0 && <li>Valor máximo do prêmio</li>}
+                {!importedInstantPrizesFileContent && <li>Upload do arquivo na Modalidade Incentivo</li>}
+                {generatedCapitalizadoraNumbers.length === 0 && <li>Geração da grade de números da filantropia</li>}
+              </ul>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="border-[#9FFF00]/30 text-[#9FFF00] bg-transparent hover:bg-[#9FFF00]/10"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              onClick={form.handleSubmit(onSubmit)}
+              disabled={isSubmitting || !isFormValid}
+              className="bg-[#9FFF00] text-black hover:bg-lime-400 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {edition ? "Salvar Alterações" : "Criar Edição"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
 
