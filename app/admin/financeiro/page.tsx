@@ -7,6 +7,7 @@ import AdminHeaderMobile from "@/components/admin/admin-header-mobile"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PermissionGuard } from "@/components/admin/permission-guard"
+import { dashboardService, type Edicao } from "@/services/dashboard"
 
 // Import finance components
 import FinanceiroOverviewDashboard from "@/components/admin/financeiro/financeiro-overview-dashboard"
@@ -20,7 +21,9 @@ const WARNING_THRESHOLD_SECONDS = 60 // 1 minute
 
 export default function FinanceiroPage() {
   const router = useRouter()
-  const [selectedEdition, setSelectedEdition] = useState("edition-5")
+  const [edicoes, setEdicoes] = useState<Edicao[]>([])
+  const [isLoadingEdicoes, setIsLoadingEdicoes] = useState(true)
+  const [selectedEdition, setSelectedEdition] = useState("")
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(SESSION_TIMEOUT_SECONDS)
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [showSessionWarning, setShowSessionWarning] = useState(false)
@@ -35,6 +38,25 @@ export default function FinanceiroPage() {
     console.log("Admin logged out due to inactivity or explicit action.")
     router.push("/admin/login")
   }
+
+  // Carregar edições da API
+  useEffect(() => {
+    const loadEdicoes = async () => {
+      try {
+        const data = await dashboardService.getEdicoes()
+        setEdicoes(data)
+        if (data.length > 0) {
+          setSelectedEdition(data[0].id)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar edições:', error)
+      } finally {
+        setIsLoadingEdicoes(false)
+      }
+    }
+
+    loadEdicoes()
+  }, [])
 
   // Session Timer Effect
   useEffect(() => {
@@ -63,15 +85,7 @@ export default function FinanceiroPage() {
     }
   }, [])
 
-  const editions = [
-    { id: "edition-5", name: "Edição #5 – 29/01 até 04/02", startDate: "29/01", endDate: "04/02" },
-    { id: "edition-4", name: "Edição #4 – 22/01 até 28/01", startDate: "22/01", endDate: "28/01" },
-    { id: "edition-3", name: "Edição #3 – 15/01 até 21/01", startDate: "15/01", endDate: "21/01" },
-    { id: "edition-2", name: "Edição #2 – 08/01 até 14/01", startDate: "08/01", endDate: "14/01" },
-    { id: "edition-1", name: "Edição #1 – 01/01 até 07/01", startDate: "01/01", endDate: "07/01" },
-  ]
-
-  const currentEditionData = editions.find((e) => e.id === selectedEdition) || editions[0]
+  const currentEditionData = edicoes.find((e) => e.id === selectedEdition)
 
   return (
     <PermissionGuard requiredPermission="financeiro">
@@ -97,16 +111,30 @@ export default function FinanceiroPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <h1 className="text-2xl font-bold text-white mb-4 sm:mb-0">Análise Financeira</h1>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Select value={selectedEdition} onValueChange={setSelectedEdition}>
+            <Select 
+              value={selectedEdition} 
+              onValueChange={setSelectedEdition}
+              disabled={isLoadingEdicoes}
+            >
               <SelectTrigger className="w-full sm:w-[280px] bg-[#232A34] border-[#366D51] text-white">
-                <SelectValue placeholder="Selecione a Edição" />
+                <SelectValue placeholder={isLoadingEdicoes ? "Carregando edições..." : "Selecione a Edição"} />
               </SelectTrigger>
               <SelectContent className="bg-[#232A34] border-[#366D51] text-white">
-                {editions.map((edition) => (
-                  <SelectItem key={edition.id} value={edition.id}>
-                    {edition.name}
+                {edicoes.length === 0 ? (
+                  <SelectItem value="empty" disabled>
+                    {isLoadingEdicoes ? "Carregando..." : "Nenhuma edição encontrada"}
                   </SelectItem>
-                ))}
+                ) : (
+                  edicoes.map((edicao) => {
+                    const dataInicio = new Date(edicao.data_inicio).toLocaleDateString('pt-BR')
+                    const dataFim = new Date(edicao.data_fim).toLocaleDateString('pt-BR')
+                    return (
+                      <SelectItem key={edicao.id} value={edicao.id}>
+                        {`${edicao.nome} (${dataInicio} até ${dataFim})`}
+                      </SelectItem>
+                    )
+                  })
+                )}
               </SelectContent>
             </Select>
             <div className="flex gap-2"></div>

@@ -32,6 +32,17 @@ interface Purchase {
   status_pagamento: "pago" | "pendente"
 }
 
+interface Withdraw {
+  nome_cliente: string
+  cpf: string
+  data_saque: string
+  valor_saque: number
+  chave_pix: string
+  status_saque: "pago" | "pendente" | "aprovado" | "reprovado" | "cancelado"
+  justificativa_reprovacao?: string
+  data_aprovacao?: string
+}
+
 interface TransactionResponse {
   depositos: Transacao[]
   saques: Transacao[]
@@ -44,14 +55,25 @@ interface SortConfig {
 
 export default function FinanceiroPurchasesTable() {
   const [currentPage, setCurrentPage] = useState(1)
+  const [currentWithdrawPage, setCurrentWithdrawPage] = useState(1)
   const [searchName, setSearchName] = useState("")
   const [searchCPF, setSearchCPF] = useState("")
+  const [searchWithdrawName, setSearchWithdrawName] = useState("")
+  const [searchWithdrawCPF, setSearchWithdrawCPF] = useState("")
   const [dateRange, setDateRange] = useState<DateRange>({
+    from: addDays(new Date(), -7),
+    to: new Date(),
+  })
+  const [withdrawDateRange, setWithdrawDateRange] = useState<DateRange>({
     from: addDays(new Date(), -7),
     to: new Date(),
   })
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "data_compra",
+    direction: "desc",
+  })
+  const [withdrawSortConfig, setWithdrawSortConfig] = useState<SortConfig>({
+    key: "data_saque",
     direction: "desc",
   })
 
@@ -114,10 +136,56 @@ export default function FinanceiroPurchasesTable() {
     }
   })
 
+  const { data: withdraws = [], isLoading: isLoadingWithdraws, error: withdrawError } = useQuery({
+    queryKey: ["withdraws"],
+    queryFn: async () => {
+      try {
+        const response = await api.get("/api/transacoes/admin/todas");
+        
+        // Filtrar apenas transações do tipo "saque"
+        const transactions = Array.isArray(response.data) ? response.data : [];
+        const saqueTransactions = transactions.filter((transaction: any) => transaction.tipo === "saque");
+        
+        const mappedWithdraws = saqueTransactions.map((transaction: any) => ({
+          nome_cliente: transaction.profiles?.full_name || transaction.nome_cliente || 'N/A',
+          cpf: transaction.profiles?.cpf || transaction.cpf || 'N/A',
+          data_saque: transaction.data || transaction.data_saque,
+          valor_saque: transaction.valor || transaction.valor_saque || 0,
+          chave_pix: transaction.chave_pix || 'N/A',
+          status_saque: transaction.status || transaction.status_saque || 'pendente',
+          justificativa_reprovacao: transaction.justificativa_reprovacao,
+          data_aprovacao: transaction.data_aprovacao,
+          id: transaction.id || `${transaction.cpf}-${transaction.data_saque}-${transaction.valor_saque}`
+        }));
+        
+        return mappedWithdraws;
+      } catch (error: any) {
+        console.error("Erro ao buscar saques:", error);
+        
+        if (error.response?.data?.error) {
+          throw new Error(error.response.data.error);
+        }
+        
+        if (error.request) {
+          throw new Error("Erro de conexão com o servidor. Verifique sua internet.");
+        }
+        
+        throw new Error("Não foi possível carregar os saques. Por favor, tente novamente.");
+      }
+    }
+  })
+
   const itemsPerPage = 10
 
   const handleSort = (key: keyof Purchase) => {
     setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }))
+  }
+
+  const handleWithdrawSort = (key: keyof Withdraw) => {
+    setWithdrawSortConfig((prev) => ({
       key,
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }))
@@ -161,12 +229,42 @@ export default function FinanceiroPurchasesTable() {
     })
   }
 
+  const filterWithdraws = (withdraws: Withdraw[]) => {
+    return withdraws.filter((withdraw) => {
+      const nameMatch = withdraw.nome_cliente.toLowerCase().includes(searchWithdrawName.toLowerCase())
+      const cpfMatch = withdraw.cpf.includes(searchWithdrawCPF)
+      const withdrawDate = new Date(withdraw.data_saque)
+      
+      // Validação de datas
+      let dateMatch = true
+      if (withdrawDateRange && withdrawDateRange.from) {
+        dateMatch = dateMatch && withdrawDate >= withdrawDateRange.from
+      }
+      if (withdrawDateRange && withdrawDateRange.to) {
+        dateMatch = dateMatch && withdrawDate <= withdrawDateRange.to
+      }
+
+      return nameMatch && cpfMatch && dateMatch
+    })
+  }
+
   const sortPurchases = (purchases: Purchase[]) => {
     return [...purchases].sort((a, b) => {
       if (sortConfig.key === "valor_pago" || sortConfig.key === "data_compra") {
         const aValue = sortConfig.key === "valor_pago" ? a.valor_pago : new Date(a.data_compra).getTime()
         const bValue = sortConfig.key === "valor_pago" ? b.valor_pago : new Date(b.data_compra).getTime()
         return sortConfig.direction === "asc" ? aValue - bValue : bValue - aValue
+      }
+      return 0
+    })
+  }
+
+  const sortWithdraws = (withdraws: Withdraw[]) => {
+    return [...withdraws].sort((a, b) => {
+      if (withdrawSortConfig.key === "valor_saque" || withdrawSortConfig.key === "data_saque") {
+        const aValue = withdrawSortConfig.key === "valor_saque" ? a.valor_saque : new Date(a.data_saque).getTime()
+        const bValue = withdrawSortConfig.key === "valor_saque" ? b.valor_saque : new Date(b.data_saque).getTime()
+        return withdrawSortConfig.direction === "asc" ? aValue - bValue : bValue - aValue
       }
       return 0
     })
@@ -179,6 +277,13 @@ export default function FinanceiroPurchasesTable() {
     currentPage * itemsPerPage,
   )
 
+  const filteredAndSortedWithdraws = sortWithdraws(filterWithdraws(withdraws))
+  const totalWithdrawPages = Math.ceil(filteredAndSortedWithdraws.length / itemsPerPage)
+  const currentWithdraws = filteredAndSortedWithdraws.slice(
+    (currentWithdrawPage - 1) * itemsPerPage,
+    currentWithdrawPage * itemsPerPage,
+  )
+
   const SortIcon = ({ column }: { column: keyof Purchase }) => {
     if (sortConfig.key !== column) return null
     return sortConfig.direction === "asc" ? (
@@ -188,176 +293,359 @@ export default function FinanceiroPurchasesTable() {
     )
   }
 
-  return (
-    <Card className="bg-[#232A34] border-[#366D51] shadow-md mb-8">
-      <CardHeader>
-        <CardTitle className="text-white">Compras Realizadas</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-            </div>
-          ) : error ? (
-            <div className="text-red-400 text-center py-4">
-              Erro ao carregar as transações. Por favor, tente novamente.
-            </div>
-          ) : (
-          <>
-          {/* Filtros */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              placeholder="Buscar por nome..."
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              className="bg-[#191F26] border-[#366D51] text-white"
-            />
-            <Input
-              placeholder="Buscar por CPF..."
-              value={searchCPF}
-              onChange={(e) => setSearchCPF(e.target.value)}
-              className="bg-[#191F26] border-[#366D51] text-white"
-            />
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
-          </div>
+  const WithdrawSortIcon = ({ column }: { column: keyof Withdraw }) => {
+    if (withdrawSortConfig.key !== column) return null
+    return withdrawSortConfig.direction === "asc" ? (
+      <ChevronUp className="h-4 w-4 inline" />
+    ) : (
+      <ChevronDown className="h-4 w-4 inline" />
+    )
+  }
 
-          {/* Tabela */}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-[#191F26]">
-                <TableRow className="border-[#366D51]">
-                  <TableHead className="text-white text-center">Nome do Cliente</TableHead>
-                  <TableHead className="text-white text-center">CPF</TableHead>
-                  <TableHead
-                    className="text-white cursor-pointer text-center"
-                    onClick={() => handleSort("data_compra")}
-                  >
-                    Data da Compra <SortIcon column="data_compra" />
-                  </TableHead>
-                  <TableHead
-                    className="text-white cursor-pointer text-center"
-                    onClick={() => handleSort("valor_pago")}
-                  >
-                    Valor Pago <SortIcon column="valor_pago" />
-                  </TableHead>
-                  <TableHead className="text-white text-center">Edição</TableHead>
-                  <TableHead className="text-white text-center">Status</TableHead>
-                  <TableHead className="text-white text-center">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="bg-[#232A34]">
-                {currentPurchases.map((purchase) => (
-                  <TableRow key={`${purchase.cpf}-${purchase.data_compra}-${purchase.valor_pago}`} className="border-[#366D51] hover:bg-[#191F26]">
-                    <TableCell className="font-medium text-white text-center">{purchase.nome_cliente}</TableCell>
-                    <TableCell className="text-gray-300 text-center">{formatCPF(purchase.cpf)}</TableCell>
-                    <TableCell className="text-gray-300 text-center">{formatDate(purchase.data_compra)}</TableCell>
-                    <TableCell className="text-white text-center">{formatCurrency(purchase.valor_pago)}</TableCell>
-                    <TableCell className="text-gray-300 text-center">{purchase.nome_edicao}</TableCell>
-                    <TableCell className={`${getStatusColor(purchase.status_pagamento)} text-center`}>{purchase.status_pagamento}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex gap-2 justify-center">
+  return (
+    <>
+      <Card className="bg-[#232A34] border-[#366D51] shadow-md mb-8">
+        <CardHeader>
+          <CardTitle className="text-white">Compras Realizadas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {isLoading ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              </div>
+            ) : error ? (
+              <div className="text-red-400 text-center py-4">
+                Erro ao carregar as transações. Por favor, tente novamente.
+              </div>
+            ) : (
+            <>
+            {/* Filtros */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Input
+                placeholder="Buscar por nome..."
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                className="bg-[#191F26] border-[#366D51] text-white"
+              />
+              <Input
+                placeholder="Buscar por CPF..."
+                value={searchCPF}
+                onChange={(e) => setSearchCPF(e.target.value)}
+                className="bg-[#191F26] border-[#366D51] text-white"
+              />
+              <DateRangePicker value={dateRange} onChange={setDateRange} />
+            </div>
+
+            {/* Tabela */}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-[#191F26]">
+                  <TableRow className="border-[#366D51]">
+                    <TableHead className="text-white text-center">Nome do Cliente</TableHead>
+                    <TableHead className="text-white text-center">CPF</TableHead>
+                    <TableHead
+                      className="text-white cursor-pointer text-center"
+                      onClick={() => handleSort("data_compra")}
+                    >
+                      Data da Compra <SortIcon column="data_compra" />
+                    </TableHead>
+                    <TableHead
+                      className="text-white cursor-pointer text-center"
+                      onClick={() => handleSort("valor_pago")}
+                    >
+                      Valor Pago <SortIcon column="valor_pago" />
+                    </TableHead>
+                    <TableHead className="text-white text-center">Edição</TableHead>
+                    <TableHead className="text-white text-center">Status</TableHead>
+                    <TableHead className="text-white text-center">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="bg-[#232A34]">
+                  {currentPurchases.map((purchase) => (
+                    <TableRow key={`${purchase.cpf}-${purchase.data_compra}-${purchase.valor_pago}`} className="border-[#366D51] hover:bg-[#191F26]">
+                      <TableCell className="font-medium text-white text-center">{purchase.nome_cliente}</TableCell>
+                      <TableCell className="text-gray-300 text-center">{formatCPF(purchase.cpf)}</TableCell>
+                      <TableCell className="text-gray-300 text-center">{formatDate(purchase.data_compra)}</TableCell>
+                      <TableCell className="text-white text-center">{formatCurrency(purchase.valor_pago)}</TableCell>
+                      <TableCell className="text-gray-300 text-center">{purchase.nome_edicao}</TableCell>
+                      <TableCell className={`${getStatusColor(purchase.status_pagamento)} text-center`}>{purchase.status_pagamento}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-300 hover:text-white hover:bg-[#366D51]"
+                            onClick={() => {
+                              // Implementar visualização da compra
+                              console.log("Visualizar compra", purchase.id)
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-300 hover:text-white hover:bg-[#366D51]"
+                            onClick={async () => {
+                              try {
+                                const newStatus = purchase.status_pagamento === 'pago' ? 'pendente' : 'pago';
+                                await api.patch(`/api/transacoes/admin/status/${purchase.id}`, {
+                                  status: newStatus
+                                });
+                                // Força o recarregamento dos dados
+                                window.location.reload();
+                              } catch (error) {
+                                console.error('Erro ao atualizar status:', error);
+                              }
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Paginação */}
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm text-gray-400">
+                Mostrando {(currentPage - 1) * itemsPerPage + 1} a{" "}
+                {Math.min(currentPage * itemsPerPage, filteredAndSortedPurchases.length)} de{" "}
+                {filteredAndSortedPurchases.length} registros
+              </div>
+              <div className="flex gap-2 items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
+                >
+                  Anterior
+                </Button>
+                
+                {/* Números das páginas */}
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Mostrar primeira página, última página, página atual e páginas adjacentes
+                      return page === 1 || 
+                             page === totalPages || 
+                             Math.abs(page - currentPage) <= 1
+                    })
+                    .map((page, index, array) => (
+                      <div key={page} className="flex items-center">
+                        {index > 0 && array[index - 1] !== page - 1 && (
+                          <span className="text-gray-400 px-2">...</span>
+                        )}
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-gray-300 hover:text-white hover:bg-[#366D51]"
-                          onClick={() => {
-                            // Implementar visualização da compra
-                            console.log("Visualizar compra", purchase.id)
-                          }}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 ${
+                            currentPage === page 
+                              ? "bg-[#366D51] text-white" 
+                              : "bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
+                          }`}
                         >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-gray-300 hover:text-white hover:bg-[#366D51]"
-                          onClick={async () => {
-                            try {
-                              const newStatus = purchase.status_pagamento === 'pago' ? 'pendente' : 'pago';
-                              await api.patch(`/api/transacoes/admin/status/${purchase.id}`, {
-                                status: newStatus
-                              });
-                              // Força o recarregamento dos dados
-                              window.location.reload();
-                            } catch (error) {
-                              console.error('Erro ao atualizar status:', error);
-                            }
-                          }}
-                        >
-                          <Edit2 className="h-4 w-4" />
+                          {page}
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    ))}
+                </div>
 
-          {/* Paginação */}
-          <div className="flex justify-between items-center mt-4">
-            <div className="text-sm text-gray-400">
-              Mostrando {(currentPage - 1) * itemsPerPage + 1} a{" "}
-              {Math.min(currentPage * itemsPerPage, filteredAndSortedPurchases.length)} de{" "}
-              {filteredAndSortedPurchases.length} registros
-            </div>
-            <div className="flex gap-2 items-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
-              >
-                Anterior
-              </Button>
-              
-              {/* Números das páginas */}
-              <div className="flex gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(page => {
-                    // Mostrar primeira página, última página, página atual e páginas adjacentes
-                    return page === 1 || 
-                           page === totalPages || 
-                           Math.abs(page - currentPage) <= 1
-                  })
-                  .map((page, index, array) => (
-                    <div key={page} className="flex items-center">
-                      {index > 0 && array[index - 1] !== page - 1 && (
-                        <span className="text-gray-400 px-2">...</span>
-                      )}
-                      <Button
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 ${
-                          currentPage === page 
-                            ? "bg-[#366D51] text-white" 
-                            : "bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
-                        }`}
-                      >
-                        {page}
-                      </Button>
-                    </div>
-                  ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
+                >
+                  Próxima
+                </Button>
               </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
-              >
-                Próxima
-              </Button>
             </div>
+            </>
+            )}
           </div>
-          </>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Tabela de Saques Realizados */}
+      <Card className="bg-[#232A34] border-[#366D51] shadow-md">
+        <CardHeader>
+          <CardTitle className="text-white">Saques Realizados</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {isLoadingWithdraws ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              </div>
+            ) : withdrawError ? (
+              <div className="text-red-400 text-center py-4">
+                Erro ao carregar os saques. Por favor, tente novamente.
+              </div>
+            ) : (
+            <>
+            {/* Filtros para Saques */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Input
+                placeholder="Buscar por nome..."
+                value={searchWithdrawName}
+                onChange={(e) => setSearchWithdrawName(e.target.value)}
+                className="bg-[#191F26] border-[#366D51] text-white"
+              />
+              <Input
+                placeholder="Buscar por CPF..."
+                value={searchWithdrawCPF}
+                onChange={(e) => setSearchWithdrawCPF(e.target.value)}
+                className="bg-[#191F26] border-[#366D51] text-white"
+              />
+              <DateRangePicker value={withdrawDateRange} onChange={setWithdrawDateRange} />
+            </div>
+
+            {/* Tabela de Saques */}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-[#191F26]">
+                  <TableRow className="border-[#366D51]">
+                    <TableHead className="text-white text-center">Nome do Cliente</TableHead>
+                    <TableHead className="text-white text-center">CPF</TableHead>
+                    <TableHead
+                      className="text-white cursor-pointer text-center"
+                      onClick={() => handleWithdrawSort("data_saque")}
+                    >
+                      Data do Saque <WithdrawSortIcon column="data_saque" />
+                    </TableHead>
+                    <TableHead
+                      className="text-white cursor-pointer text-center"
+                      onClick={() => handleWithdrawSort("valor_saque")}
+                    >
+                      Valor do Saque <WithdrawSortIcon column="valor_saque" />
+                    </TableHead>
+                    <TableHead className="text-white text-center">Chave PIX</TableHead>
+                    <TableHead className="text-white text-center">Status</TableHead>
+                    <TableHead className="text-white text-center">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="bg-[#232A34]">
+                  {currentWithdraws.map((withdraw) => (
+                    <TableRow key={withdraw.id} className="border-[#366D51] hover:bg-[#191F26]">
+                      <TableCell className="font-medium text-white text-center">{withdraw.nome_cliente}</TableCell>
+                      <TableCell className="text-gray-300 text-center">{formatCPF(withdraw.cpf)}</TableCell>
+                      <TableCell className="text-gray-300 text-center">{formatDate(withdraw.data_saque)}</TableCell>
+                      <TableCell className="text-white text-center">{formatCurrency(withdraw.valor_saque)}</TableCell>
+                      <TableCell className="text-gray-300 text-center">{withdraw.chave_pix}</TableCell>
+                      <TableCell className={`${getStatusColor(withdraw.status_saque)} text-center`}>{withdraw.status_saque}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex gap-2 justify-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-300 hover:text-white hover:bg-[#366D51]"
+                            onClick={() => {
+                              // Implementar visualização do saque
+                              console.log("Visualizar saque", withdraw.id)
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-300 hover:text-white hover:bg-[#366D51]"
+                            onClick={async () => {
+                              try {
+                                const newStatus = withdraw.status_saque === 'pago' ? 'pendente' : 'pago';
+                                await api.patch(`/api/transacoes/admin/status/${withdraw.id}`, {
+                                  status: newStatus
+                                });
+                                // Força o recarregamento dos dados
+                                window.location.reload();
+                              } catch (error) {
+                                console.error('Erro ao atualizar status do saque:', error);
+                              }
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Paginação para Saques */}
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm text-gray-400">
+                Mostrando {(currentWithdrawPage - 1) * itemsPerPage + 1} a{" "}
+                {Math.min(currentWithdrawPage * itemsPerPage, filteredAndSortedWithdraws.length)} de{" "}
+                {filteredAndSortedWithdraws.length} registros
+              </div>
+              <div className="flex gap-2 items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentWithdrawPage((p) => Math.max(1, p - 1))}
+                  disabled={currentWithdrawPage === 1}
+                  className="bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
+                >
+                  Anterior
+                </Button>
+                
+                {/* Números das páginas para Saques */}
+                <div className="flex gap-1">
+                  {Array.from({ length: totalWithdrawPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Mostrar primeira página, última página, página atual e páginas adjacentes
+                      return page === 1 || 
+                             page === totalWithdrawPages || 
+                             Math.abs(page - currentWithdrawPage) <= 1
+                    })
+                    .map((page, index, array) => (
+                      <div key={page} className="flex items-center">
+                        {index > 0 && array[index - 1] !== page - 1 && (
+                          <span className="text-gray-400 px-2">...</span>
+                        )}
+                        <Button
+                          variant={currentWithdrawPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentWithdrawPage(page)}
+                          className={`w-8 ${
+                            currentWithdrawPage === page 
+                              ? "bg-[#366D51] text-white" 
+                              : "bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
+                          }`}
+                        >
+                          {page}
+                        </Button>
+                      </div>
+                    ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentWithdrawPage((p) => Math.min(totalWithdrawPages, p + 1))}
+                  disabled={currentWithdrawPage === totalWithdrawPages}
+                  className="bg-[#191F26] border-[#366D51] text-white hover:bg-[#232A34]"
+                >
+                  Próxima
+                </Button>
+              </div>
+            </div>
+            </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </>
   )
 } 
