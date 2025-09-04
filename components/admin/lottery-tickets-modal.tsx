@@ -283,10 +283,10 @@ export default function LotteryTicketsModal({
               </span>
               <span>
                 Títulos Pagos:{" "}
-                <span className="font-bold text-[#9FFF00]">{totalTitulosPagos.toLocaleString("pt-BR")}</span>
+                <span className="font-bold text-[#9FFF00]">{Number(totalTitulosPagos || 0).toLocaleString("pt-BR")}</span>
               </span>
               <span>
-                Pagamentos Pendentes: <span className="font-bold text-[#9FFF00]">{totalSoldCount.toLocaleString("pt-BR")}</span>
+                Pagamentos Pendentes: <span className="font-bold text-[#9FFF00]">{Number(totalSoldCount || 0).toLocaleString("pt-BR")}</span>
               </span>
             </div>
             {selectedTitles.length > 0 && (

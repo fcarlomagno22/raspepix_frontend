@@ -234,7 +234,7 @@ export async function buscarTotalTitulosPagos(sorteioId: string): Promise<number
   try {
     const response = await api.get(`/api/admin/sorteios/${sorteioId}/titulos-pagos/total`);
 
-    return response.data.total;
+    return response.data.total || 0;
   } catch (error) {
     console.error('Erro ao buscar total de títulos pagos:', error);
     throw new Error('Erro ao buscar total de títulos pagos');
@@ -243,13 +243,13 @@ export async function buscarTotalTitulosPagos(sorteioId: string): Promise<number
 
 export async function buscarTotalTitulosPendentes(edicaoId: string): Promise<number> {
   const response = await api.get(`/api/admin/sorteios/${edicaoId}/titulos-pendentes/total`);
-  return response.data.total;
+  return response.data.total || 0;
 } 
 
 export async function atualizarStatusPagamentoTitulo(tituloId: string, novoStatus: 'PAGO' | 'PENDENTE') {
   try {
-    const response = await api.patch(`/api/sorteio/titulos/${tituloId}/pagamento`, {
-      status_pagamento: novoStatus.toLowerCase()
+    const response = await api.patch(`/api/sorteio/titulos/${tituloId}/status-pagamento`, {
+      status_pagamento: novoStatus
     });
     return response.data;
   } catch (error) {
